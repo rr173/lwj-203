@@ -20,6 +20,7 @@ function handleStatusTransition(ccp, newStatus, reading) {
       initialTemperature: reading.temperature,
       initialReadingTime: reading.timestamp
     });
+    ccp.status = newStatus;
     store.updateCCP(ccp.id, { status: newStatus });
     return deviation;
   }
@@ -34,6 +35,7 @@ function handleStatusTransition(ccp, newStatus, reading) {
         closedBy: 'system'
       });
     }
+    ccp.status = 'normal';
     store.updateCCP(ccp.id, { status: 'normal' });
   }
 
@@ -42,10 +44,12 @@ function handleStatusTransition(ccp, newStatus, reading) {
     if (openDeviation) {
       store.updateDeviation(openDeviation.id, { level: 'critical' });
     }
+    ccp.status = 'critical';
     store.updateCCP(ccp.id, { status: 'critical' });
   }
 
   if (oldStatus === 'critical' && newStatus === 'minor') {
+    ccp.status = 'minor';
     store.updateCCP(ccp.id, { status: 'minor' });
   }
 
@@ -86,22 +90,25 @@ function submitReadings(req, res) {
       continue;
     }
 
-    ccpReadings.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
     const lastReading = store.getLastReading(ccpId);
-    const lastTime = lastReading ? new Date(lastReading.timestamp).getTime() : 0;
+    let lastTime = lastReading ? new Date(lastReading.timestamp).getTime() : 0;
+    let hasOutOfOrder = false;
 
-    let validReadings = [];
     for (const reading of ccpReadings) {
       const readingTime = new Date(reading.timestamp).getTime();
       if (readingTime <= lastTime) {
-        errors.push({ ccpId, timestamp: reading.timestamp, error: '时间戳乱序，必须递增' });
-        continue;
+        errors.push({ ccpId, timestamp: reading.timestamp, error: '时间戳乱序，必须递增，该CCP批次内所有读数已拒绝' });
+        hasOutOfOrder = true;
+        break;
       }
-      validReadings.push(reading);
+      lastTime = readingTime;
     }
 
-    for (const reading of validReadings) {
+    if (hasOutOfOrder) {
+      continue;
+    }
+
+    for (const reading of ccpReadings) {
       const level = determineReadingLevel(reading.temperature, ccp);
       const savedReading = store.addReading(ccpId, {
         timestamp: reading.timestamp,
@@ -120,8 +127,8 @@ function submitReadings(req, res) {
       });
     }
 
-    if (validReadings.length > 0) {
-      const lastValid = validReadings[validReadings.length - 1];
+    if (ccpReadings.length > 0) {
+      const lastValid = ccpReadings[ccpReadings.length - 1];
       store.updateCCP(ccpId, { lastReadingTime: lastValid.timestamp });
     }
   }
@@ -136,7 +143,7 @@ function submitReadings(req, res) {
 
 function getReadings(req, res) {
   const { ccpId } = req.params;
-  const { startTime, endTime } = req.query;
+  const { startTime, endTime, page = 1, pageSize = 100 } = req.query;
 
   const ccp = store.getCCP(ccpId);
   if (!ccp) {
@@ -146,8 +153,26 @@ function getReadings(req, res) {
   const startMs = startTime ? new Date(startTime).getTime() : null;
   const endMs = endTime ? new Date(endTime).getTime() : null;
 
-  const readings = store.getReadings(ccpId, startMs, endMs);
-  res.json(readings);
+  let readings = store.getReadings(ccpId, startMs, endMs);
+  
+  readings.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const pageNum = parseInt(page, 10);
+  const size = parseInt(pageSize, 10);
+  const total = readings.length;
+  const totalPages = Math.ceil(total / size);
+  const startIndex = (pageNum - 1) * size;
+  const paginatedReadings = readings.slice(startIndex, startIndex + size);
+
+  res.json({
+    data: paginatedReadings,
+    pagination: {
+      page: pageNum,
+      pageSize: size,
+      total,
+      totalPages
+    }
+  });
 }
 
 module.exports = {

@@ -1,7 +1,7 @@
 const store = require('./store');
 
 function getAllDeviations(req, res) {
-  const { status, ccpId, productionLine } = req.query;
+  const { status, ccpId, productionLine, startTime, endTime, page = 1, pageSize = 20 } = req.query;
   let deviations = store.getAllDeviations();
 
   if (status) {
@@ -14,8 +14,33 @@ function getAllDeviations(req, res) {
     const ccpIds = store.getCCPsByProductionLine(productionLine).map(c => c.id);
     deviations = deviations.filter(d => ccpIds.includes(d.ccpId));
   }
+  if (startTime) {
+    const startMs = new Date(startTime).getTime();
+    deviations = deviations.filter(d => new Date(d.createdAt).getTime() >= startMs);
+  }
+  if (endTime) {
+    const endMs = new Date(endTime).getTime();
+    deviations = deviations.filter(d => new Date(d.createdAt).getTime() <= endMs);
+  }
 
-  res.json(deviations);
+  deviations.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const pageNum = parseInt(page, 10);
+  const size = parseInt(pageSize, 10);
+  const total = deviations.length;
+  const totalPages = Math.ceil(total / size);
+  const startIndex = (pageNum - 1) * size;
+  const paginatedDeviations = deviations.slice(startIndex, startIndex + size);
+
+  res.json({
+    data: paginatedDeviations,
+    pagination: {
+      page: pageNum,
+      pageSize: size,
+      total,
+      totalPages
+    }
+  });
 }
 
 function getDeviation(req, res) {
