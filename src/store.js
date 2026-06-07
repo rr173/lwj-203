@@ -4,11 +4,13 @@ class DataStore {
     this.readings = new Map();
     this.deviations = new Map();
     this.correctiveActions = new Map();
+    this.offlineAlerts = new Map();
     this.productionLines = new Set();
     this.nextCcpId = 1;
     this.nextReadingId = 1;
     this.nextDeviationId = 1;
     this.nextActionId = 1;
+    this.nextOfflineAlertId = 1;
   }
 
   generateId(type) {
@@ -21,6 +23,8 @@ class DataStore {
         return `DEV${String(this.nextDeviationId++).padStart(6, '0')}`;
       case 'action':
         return this.nextActionId++;
+      case 'offlineAlert':
+        return `OFF${String(this.nextOfflineAlertId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -138,6 +142,61 @@ class DataStore {
 
   getAllProductionLines() {
     return Array.from(this.productionLines);
+  }
+
+  addOfflineAlert(alert) {
+    const id = this.generateId('offlineAlert');
+    const alertWithId = {
+      ...alert,
+      id,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+      resolvedAt: null,
+      durationSeconds: null
+    };
+    this.offlineAlerts.set(id, alertWithId);
+    return alertWithId;
+  }
+
+  getOfflineAlert(id) {
+    return this.offlineAlerts.get(id);
+  }
+
+  getAllOfflineAlerts() {
+    return Array.from(this.offlineAlerts.values());
+  }
+
+  getOpenOfflineAlerts() {
+    return Array.from(this.offlineAlerts.values()).filter(a => a.status === 'open');
+  }
+
+  getOfflineAlertsByCCP(ccpId) {
+    return Array.from(this.offlineAlerts.values()).filter(a => a.ccpId === ccpId);
+  }
+
+  getOpenOfflineAlertForCCP(ccpId) {
+    return Array.from(this.offlineAlerts.values()).find(a => a.ccpId === ccpId && a.status === 'open');
+  }
+
+  updateOfflineAlert(id, updates) {
+    const alert = this.offlineAlerts.get(id);
+    if (!alert) return null;
+    const updated = { ...alert, ...updates };
+    this.offlineAlerts.set(id, updated);
+    return updated;
+  }
+
+  resolveOfflineAlert(id, resolvedAt) {
+    const alert = this.offlineAlerts.get(id);
+    if (!alert) return null;
+    const start = new Date(alert.createdAt).getTime();
+    const end = new Date(resolvedAt).getTime();
+    const durationSeconds = Math.round((end - start) / 1000);
+    return this.updateOfflineAlert(id, {
+      status: 'resolved',
+      resolvedAt,
+      durationSeconds
+    });
   }
 }
 

@@ -1,4 +1,5 @@
 const store = require('./store');
+const { handleCCPRecovered } = require('./heartbeatController');
 
 function determineReadingLevel(temperature, ccp) {
   if (temperature < ccp.criticalMin || temperature > ccp.criticalMax) {
@@ -130,6 +131,7 @@ function submitReadings(req, res) {
     if (ccpReadings.length > 0) {
       const lastValid = ccpReadings[ccpReadings.length - 1];
       store.updateCCP(ccpId, { lastReadingTime: lastValid.timestamp });
+      handleCCPRecovered(ccpId, lastValid.timestamp);
     }
   }
 

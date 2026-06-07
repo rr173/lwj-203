@@ -5,6 +5,7 @@ const ccpController = require('./ccpController');
 const readingController = require('./readingController');
 const deviationController = require('./deviationController');
 const reportController = require('./reportController');
+const heartbeatController = require('./heartbeatController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 
@@ -38,6 +39,10 @@ app.post('/api/deviations/:id/close', deviationController.closeDeviation);
 app.get('/api/reports/production-line/:productionLine', reportController.getProductionLineReport);
 app.get('/api/reports/ccp/:ccpId/timeline', reportController.getCCPTimeline);
 
+app.get('/api/offline-ccps', heartbeatController.getOfflineCCPs);
+app.get('/api/offline-alerts', heartbeatController.getOfflineAlerts);
+app.get('/api/reports/online-rate', heartbeatController.getOnlineRateStats);
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: '服务器内部错误' });
@@ -69,6 +74,9 @@ app.listen(PORT, () => {
 ║  POST   /api/deviations/:id/close                            ║
 ║  GET    /api/reports/production-line/:productionLine         ║
 ║  GET    /api/reports/ccp/:ccpId/timeline                     ║
+║  GET    /api/offline-ccps (当前离线CCP列表)                   ║
+║  GET    /api/offline-alerts (历史离线告警记录)                ║
+║  GET    /api/reports/online-rate (CCP在线率统计)              ║
 ╚══════════════════════════════════════════════════════════════╝
   `);
 });
