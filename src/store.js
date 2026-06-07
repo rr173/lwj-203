@@ -32,7 +32,8 @@ class DataStore {
 
   addCCP(ccp) {
     const id = this.generateId('ccp');
-    const ccpWithId = { ...ccp, id, status: 'normal', isActive: true, lastReadingTime: null };
+    const now = new Date().toISOString();
+    const ccpWithId = { ...ccp, id, status: 'normal', isActive: true, lastReadingTime: now, createdAt: now };
     this.ccps.set(id, ccpWithId);
     this.readings.set(id, []);
     if (ccp.productionLine) {
@@ -191,10 +192,12 @@ class DataStore {
     if (!alert) return null;
     const start = new Date(alert.createdAt).getTime();
     const end = new Date(resolvedAt).getTime();
-    const durationSeconds = Math.round((end - start) / 1000);
+    const actualEnd = Math.max(start, end);
+    const durationSeconds = Math.round((actualEnd - start) / 1000);
+    const actualResolvedAt = new Date(actualEnd).toISOString();
     return this.updateOfflineAlert(id, {
       status: 'resolved',
-      resolvedAt,
+      resolvedAt: actualResolvedAt,
       durationSeconds
     });
   }

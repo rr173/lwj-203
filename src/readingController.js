@@ -129,9 +129,10 @@ function submitReadings(req, res) {
     }
 
     if (ccpReadings.length > 0) {
+      const firstValid = ccpReadings[0];
       const lastValid = ccpReadings[ccpReadings.length - 1];
       store.updateCCP(ccpId, { lastReadingTime: lastValid.timestamp });
-      handleCCPRecovered(ccpId, lastValid.timestamp);
+      handleCCPRecovered(ccpId, firstValid.timestamp);
     }
   }
 

@@ -108,6 +108,26 @@ function getOfflineAlerts(req, res) {
   res.json(alerts);
 }
 
+function mergeOverlappingIntervals(intervals) {
+  if (intervals.length === 0) return [];
+  
+  intervals.sort((a, b) => a.start - b.start);
+  
+  const merged = [intervals[0]];
+  for (let i = 1; i < intervals.length; i++) {
+    const last = merged[merged.length - 1];
+    const current = intervals[i];
+    
+    if (current.start <= last.end) {
+      last.end = Math.max(last.end, current.end);
+    } else {
+      merged.push(current);
+    }
+  }
+  
+  return merged;
+}
+
 function getOnlineRateStats(req, res) {
   const { productionLine, startTime, endTime } = req.query;
 
@@ -121,7 +141,7 @@ function getOnlineRateStats(req, res) {
   const now = Date.now();
   const endMs = endTime ? new Date(endTime).getTime() : now;
   const startMs = startTime ? new Date(startTime).getTime() : (endMs - 24 * 60 * 60 * 1000);
-  const totalPeriodSeconds = Math.round((endMs - startMs) / 1000);
+  const totalPeriodSeconds = Math.max(1, Math.round((endMs - startMs) / 1000));
 
   const stats = [];
 
@@ -133,15 +153,24 @@ function getOnlineRateStats(req, res) {
       return alertEnd >= startMs && alertStart <= endMs;
     });
 
-    let totalOfflineSeconds = 0;
+    const intervals = [];
     for (const alert of relevantAlerts) {
       const alertStart = Math.max(new Date(alert.createdAt).getTime(), startMs);
       const alertEnd = Math.min(alert.resolvedAt ? new Date(alert.resolvedAt).getTime() : now, endMs);
-      totalOfflineSeconds += Math.round((alertEnd - alertStart) / 1000);
+      if (alertEnd > alertStart) {
+        intervals.push({ start: alertStart, end: alertEnd });
+      }
     }
 
+    const mergedIntervals = mergeOverlappingIntervals(intervals);
+    let totalOfflineSeconds = 0;
+    for (const interval of mergedIntervals) {
+      totalOfflineSeconds += Math.round((interval.end - interval.start) / 1000);
+    }
+
+    totalOfflineSeconds = Math.min(totalOfflineSeconds, totalPeriodSeconds);
     const onlineSeconds = Math.max(0, totalPeriodSeconds - totalOfflineSeconds);
-    const onlineRate = totalPeriodSeconds > 0 ? (onlineSeconds / totalPeriodSeconds) * 100 : 100;
+    const onlineRate = Math.min(100, Math.max(0, totalPeriodSeconds > 0 ? (onlineSeconds / totalPeriodSeconds) * 100 : 100));
 
     stats.push({
       ccpId: ccp.id,
