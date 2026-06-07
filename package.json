@@ -1,0 +1,14 @@
+{
+  "name": "food-processing-temperature-control",
+  "version": "1.0.0",
+  "description": "食品加工产线温控合规记录与偏差管理服务",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}
