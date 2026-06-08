@@ -2,7 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { getRulesByCCP, createRule, updateRule, deleteRule, toggleRule, getRuleAlerts, acknowledgeRuleAlert } from '../api/client';
 
 const EMPTY_CUMULATIVE = { consecutiveCount: 3 };
-const EMPTY_TREND = { windowMinutes: 10, rateThresholdPerMinute: 2 };
+const EMPTY_TREND = { windowMinutes: 10, rateThresholdPerMinute: 2, direction: 'up' };
+
+const DIRECTION_OPTIONS = [
+  { value: 'up', label: '仅上升' },
+  { value: 'down', label: '仅下降' },
+  { value: 'both', label: '上升或下降' },
+];
 
 function RuleForm({ ccpId, rule, onSave, onCancel }) {
   const [name, setName] = useState(rule?.name || '');
@@ -101,7 +107,19 @@ function RuleForm({ ccpId, rule, onSave, onCancel }) {
               onChange={(e) => setConfig({ ...config, rateThresholdPerMinute: parseFloat(e.target.value) || 0.1 })}
               required
             />
-            <span className="rule-form-hint">温度变化速率超过此值时触发(上升或下降)</span>
+          </div>
+          <div className="rule-form-row">
+            <label className="rule-form-label">监测方向</label>
+            <select
+              className="rule-form-select"
+              value={config.direction || 'up'}
+              onChange={(e) => setConfig({ ...config, direction: e.target.value })}
+            >
+              {DIRECTION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <span className="rule-form-hint">选择"仅上升"则降温不会触发告警</span>
           </div>
         </>
       )}
@@ -193,6 +211,7 @@ export default function RuleManager({ ccpId }) {
   };
 
   const typeLabels = { cumulative: '累积告警', trend: '趋势告警' };
+  const directionLabels = { up: '上升', down: '下降', both: '双向' };
 
   if (loading) {
     return <div className="rule-manager-loading">加载规则...</div>;
@@ -269,7 +288,7 @@ export default function RuleManager({ ccpId }) {
                   <span>连续 {rule.config.consecutiveCount} 次超合规未达严重线</span>
                 )}
                 {rule.type === 'trend' && (
-                  <span>{rule.config.windowMinutes}分钟内速率 &gt; {rule.config.rateThresholdPerMinute}°C/分</span>
+                  <span>{rule.config.windowMinutes}分钟内{directionLabels[rule.config.direction] || '双向'}速率 &gt; {rule.config.rateThresholdPerMinute}°C/分</span>
                 )}
               </div>
             </div>

@@ -90,17 +90,28 @@ function evaluateTrendRule(rule, ccp, reading) {
   if (timeDiffMinutes <= 0) return null;
 
   const actualRate = tempDiff / timeDiffMinutes;
+  const direction = rule.config.direction || 'both';
 
-  if (Math.abs(actualRate) > rateThresholdPerMinute) {
-    const direction = actualRate > 0 ? '上升' : '下降';
+  let triggered = false;
+  if (direction === 'up') {
+    triggered = actualRate > rateThresholdPerMinute;
+  } else if (direction === 'down') {
+    triggered = actualRate < -rateThresholdPerMinute;
+  } else {
+    triggered = Math.abs(actualRate) > rateThresholdPerMinute;
+  }
+
+  if (triggered) {
+    const directionLabel = actualRate > 0 ? '上升' : '下降';
 
     const evidence = {
       ruleName: rule.name,
       ruleType: 'trend',
       windowMinutes,
       rateThresholdPerMinute,
+      configuredDirection: direction,
       actualRate: parseFloat(actualRate.toFixed(4)),
-      direction,
+      direction: directionLabel,
       tempDiff: parseFloat(tempDiff.toFixed(2)),
       timeDiffMinutes: parseFloat(timeDiffMinutes.toFixed(2)),
       startReading: {
@@ -117,7 +128,7 @@ function evaluateTrendRule(rule, ccp, reading) {
         temperature: r.temperature,
         timestamp: r.timestamp
       })),
-      description: `${windowMinutes}分钟内温度${direction}速率${Math.abs(actualRate).toFixed(2)}°C/分钟，超过阈值${rateThresholdPerMinute}°C/分钟`
+      description: `${windowMinutes}分钟内温度${directionLabel}速率${Math.abs(actualRate).toFixed(2)}°C/分钟，超过阈值${rateThresholdPerMinute}°C/分钟`
     };
 
     const alert = store.addRuleAlert({

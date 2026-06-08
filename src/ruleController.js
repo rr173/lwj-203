@@ -114,7 +114,7 @@ function updateRule(req, res) {
     enabled: req.body.enabled !== undefined ? req.body.enabled : rule.enabled
   });
 
-  if (req.body.config) {
+  if (req.body.config || (req.body.ccpId !== undefined && req.body.ccpId !== rule.ccpId)) {
     store.resetRuleEvalState(req.params.id);
   }
 
