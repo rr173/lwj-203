@@ -5,12 +5,17 @@ class DataStore {
     this.deviations = new Map();
     this.correctiveActions = new Map();
     this.offlineAlerts = new Map();
+    this.rules = new Map();
+    this.ruleAlerts = new Map();
+    this.ruleEvalState = new Map();
     this.productionLines = new Set();
     this.nextCcpId = 1;
     this.nextReadingId = 1;
     this.nextDeviationId = 1;
     this.nextActionId = 1;
     this.nextOfflineAlertId = 1;
+    this.nextRuleId = 1;
+    this.nextRuleAlertId = 1;
   }
 
   generateId(type) {
@@ -25,6 +30,10 @@ class DataStore {
         return this.nextActionId++;
       case 'offlineAlert':
         return `OFF${String(this.nextOfflineAlertId++).padStart(6, '0')}`;
+      case 'rule':
+        return `RULE${String(this.nextRuleId++).padStart(4, '0')}`;
+      case 'ruleAlert':
+        return `RAL${String(this.nextRuleAlertId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -200,6 +209,87 @@ class DataStore {
       resolvedAt: actualResolvedAt,
       durationSeconds
     });
+  }
+
+  addRule(rule) {
+    const id = this.generateId('rule');
+    const now = new Date().toISOString();
+    const ruleWithId = { ...rule, id, createdAt: now, updatedAt: now };
+    this.rules.set(id, ruleWithId);
+    return ruleWithId;
+  }
+
+  getRule(id) {
+    return this.rules.get(id);
+  }
+
+  getAllRules() {
+    return Array.from(this.rules.values());
+  }
+
+  getRulesByCCP(ccpId) {
+    return Array.from(this.rules.values()).filter(r => r.ccpId === ccpId);
+  }
+
+  updateRule(id, updates) {
+    const rule = this.rules.get(id);
+    if (!rule) return null;
+    const updated = { ...rule, ...updates, updatedAt: new Date().toISOString() };
+    this.rules.set(id, updated);
+    return updated;
+  }
+
+  deleteRule(id) {
+    return this.rules.delete(id);
+  }
+
+  addRuleAlert(alert) {
+    const id = this.generateId('ruleAlert');
+    const alertWithId = {
+      ...alert,
+      id,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+      acknowledgedAt: null
+    };
+    this.ruleAlerts.set(id, alertWithId);
+    return alertWithId;
+  }
+
+  getRuleAlert(id) {
+    return this.ruleAlerts.get(id);
+  }
+
+  getAllRuleAlerts() {
+    return Array.from(this.ruleAlerts.values());
+  }
+
+  getRuleAlertsByCCP(ccpId) {
+    return Array.from(this.ruleAlerts.values()).filter(a => a.ccpId === ccpId);
+  }
+
+  getRuleAlertsByRule(ruleId) {
+    return Array.from(this.ruleAlerts.values()).filter(a => a.ruleId === ruleId);
+  }
+
+  acknowledgeRuleAlert(id) {
+    const alert = this.ruleAlerts.get(id);
+    if (!alert) return null;
+    const updated = { ...alert, status: 'acknowledged', acknowledgedAt: new Date().toISOString() };
+    this.ruleAlerts.set(id, updated);
+    return updated;
+  }
+
+  getRuleEvalState(ruleId) {
+    return this.ruleEvalState.get(ruleId) || null;
+  }
+
+  setRuleEvalState(ruleId, state) {
+    this.ruleEvalState.set(ruleId, state);
+  }
+
+  resetRuleEvalState(ruleId) {
+    this.ruleEvalState.delete(ruleId);
   }
 }
 

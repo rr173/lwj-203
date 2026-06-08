@@ -66,9 +66,26 @@ function broadcastOfflineAlert(alert) {
   });
 }
 
+function broadcastRuleAlert(alert) {
+  broadcast({
+    type: 'rule_alert',
+    id: `rule_${alert.id}_${Date.now()}`,
+    data: {
+      id: alert.id,
+      ruleId: alert.ruleId,
+      ccpId: alert.ccpId,
+      ruleName: alert.ruleName,
+      ruleType: alert.ruleType,
+      evidence: alert.evidence,
+      createdAt: alert.createdAt,
+    },
+  });
+}
+
 module.exports = {
   initWebSocket,
   broadcast,
   broadcastDeviation,
   broadcastOfflineAlert,
+  broadcastRuleAlert,
 };

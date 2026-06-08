@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import TemperatureChart from '../components/TemperatureChart';
 import DeviationTimeline from '../components/DeviationTimeline';
 import OfflineAlarmHistory from '../components/OfflineAlarmHistory';
+import RuleManager from '../components/RuleManager';
 import { getCCP, getReadings, getCCPTimeline, getOfflineAlerts } from '../api/client';
 
 const STATUS_TEXT = {
@@ -154,6 +155,10 @@ export default function CCPDetail() {
       <div className="alert-history-section">
         <h3 className="alert-history-title">离线告警历史</h3>
         <OfflineAlarmHistory alerts={offlineAlerts} />
+      </div>
+
+      <div className="chart-section">
+        <RuleManager ccpId={ccpId} />
       </div>
     </div>
   );

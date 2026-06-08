@@ -63,3 +63,50 @@ export function getCCPTimeline(ccpId, startTime, endTime) {
   if (endTime) params.set('endTime', endTime);
   return fetchJSON(`/api/reports/ccp/${ccpId}/timeline?${params.toString()}`);
 }
+
+export function getRules(ccpId) {
+  const params = ccpId ? `?ccpId=${encodeURIComponent(ccpId)}` : '';
+  return fetchJSON(`/api/rules${params}`);
+}
+
+export function getRulesByCCP(ccpId) {
+  return fetchJSON(`/api/ccps/${ccpId}/rules`);
+}
+
+export function createRule(data) {
+  return fetchJSON('/api/rules', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateRule(id, data) {
+  return fetchJSON(`/api/rules/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteRule(id) {
+  return fetchJSON(`/api/rules/${id}`, { method: 'DELETE' });
+}
+
+export function toggleRule(id) {
+  return fetchJSON(`/api/rules/${id}/toggle`, { method: 'POST' });
+}
+
+export function getRuleAlerts(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.ccpId) searchParams.set('ccpId', params.ccpId);
+  if (params.ruleId) searchParams.set('ruleId', params.ruleId);
+  if (params.type) searchParams.set('type', params.type);
+  if (params.status) searchParams.set('status', params.status);
+  const qs = searchParams.toString();
+  return fetchJSON(`/api/rule-alerts${qs ? `?${qs}` : ''}`);
+}
+
+export function acknowledgeRuleAlert(id) {
+  return fetchJSON(`/api/rule-alerts/${id}/acknowledge`, { method: 'POST' });
+}

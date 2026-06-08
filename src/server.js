@@ -8,6 +8,7 @@ const deviationController = require('./deviationController');
 const reportController = require('./reportController');
 const heartbeatController = require('./heartbeatController');
 const dashboardController = require('./dashboardController');
+const ruleController = require('./ruleController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 const { initWebSocket } = require('./websocket');
@@ -47,6 +48,18 @@ app.get('/api/offline-alerts', heartbeatController.getOfflineAlerts);
 app.get('/api/reports/online-rate', heartbeatController.getOnlineRateStats);
 
 app.get('/api/dashboard/overview', dashboardController.getDashboardOverview);
+
+app.post('/api/rules', ruleController.createRule);
+app.get('/api/rules', ruleController.getAllRules);
+app.get('/api/rules/:id', ruleController.getRule);
+app.put('/api/rules/:id', ruleController.updateRule);
+app.delete('/api/rules/:id', ruleController.deleteRule);
+app.post('/api/rules/:id/toggle', ruleController.toggleRule);
+app.get('/api/ccps/:ccpId/rules', ruleController.getRulesByCCP);
+
+app.get('/api/rule-alerts', ruleController.getAllRuleAlerts);
+app.get('/api/rule-alerts/:id', ruleController.getRuleAlert);
+app.post('/api/rule-alerts/:id/acknowledge', ruleController.acknowledgeRuleAlert);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
