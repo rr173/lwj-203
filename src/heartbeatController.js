@@ -174,6 +174,11 @@ function getOnlineRateStats(req, res) {
     const onlineSeconds = Math.max(0, totalPeriodSeconds - totalOfflineSeconds);
     const onlineRate = Math.min(100, Math.max(0, totalPeriodSeconds > 0 ? (onlineSeconds / totalPeriodSeconds) * 100 : 100));
 
+    const readings = store.getReadings(ccp.id, startMs, endMs);
+    const totalReadings = readings.length;
+    const normalReadings = readings.filter(r => r.level === 'normal').length;
+    const complianceRate = totalReadings > 0 ? (normalReadings / totalReadings) * 100 : 100;
+
     stats.push({
       ccpId: ccp.id,
       ccpName: ccp.name,
@@ -186,6 +191,9 @@ function getOnlineRateStats(req, res) {
       onlineSeconds,
       offlineSeconds: totalOfflineSeconds,
       onlineRate: parseFloat(onlineRate.toFixed(2)),
+      complianceRate: parseFloat(complianceRate.toFixed(2)),
+      totalReadings,
+      normalReadings,
       offlineAlertCount: relevantAlerts.length
     });
   }

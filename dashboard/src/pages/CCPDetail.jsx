@@ -9,6 +9,7 @@ const STATUS_TEXT = {
   normal: '正常',
   minor: '轻微偏差',
   critical: '严重偏差',
+  offline: '离线',
 };
 
 export default function CCPDetail() {
@@ -56,6 +57,10 @@ export default function CCPDetail() {
     return sorted[0].temperature;
   }, [readings]);
 
+  const isOffline = useMemo(() => {
+    return offlineAlerts.some((a) => a.status === 'open');
+  }, [offlineAlerts]);
+
   if (loading) {
     return (
       <div className="ccp-detail">
@@ -78,8 +83,15 @@ export default function CCPDetail() {
     );
   }
 
-  const status = ccp.status || 'normal';
-  const statusClass = status === 'critical' ? 'critical' : status === 'minor' ? 'minor' : 'normal';
+  const status = isOffline ? 'offline' : (ccp.status || 'normal');
+  const statusClass = isOffline ? 'offline' : status === 'critical' ? 'critical' : status === 'minor' ? 'minor' : 'normal';
+
+  const badgeStyle = {
+    offline: { bg: 'var(--color-gray-bg)', color: 'var(--color-gray)' },
+    critical: { bg: 'var(--color-red-bg)', color: 'var(--color-red)' },
+    minor: { bg: 'var(--color-yellow-bg)', color: 'var(--color-yellow)' },
+    normal: { bg: 'var(--color-green-bg)', color: 'var(--color-green)' },
+  };
 
   return (
     <div className="ccp-detail">
@@ -89,14 +101,12 @@ export default function CCPDetail() {
         <h2 className="detail-title">{ccp.name}</h2>
         <span className={`detail-status-badge ${statusClass}`}
           style={{
-            background: statusClass === 'critical' ? 'var(--color-red-bg)' :
-              statusClass === 'minor' ? 'var(--color-yellow-bg)' : 'var(--color-green-bg)',
-            color: statusClass === 'critical' ? 'var(--color-red)' :
-              statusClass === 'minor' ? 'var(--color-yellow)' : 'var(--color-green)',
+            background: badgeStyle[statusClass].bg,
+            color: badgeStyle[statusClass].color,
           }}
         >
           <span className={`status-dot ${statusClass}`} />
-          {STATUS_TEXT[status] || status}
+          {STATUS_TEXT[status]}
         </span>
       </div>
 
@@ -104,8 +114,7 @@ export default function CCPDetail() {
         <div className="detail-info-item">
           <div className="detail-info-label">当前温度</div>
           <div className="detail-info-value" style={{
-            color: statusClass === 'critical' ? 'var(--color-red)' :
-              statusClass === 'minor' ? 'var(--color-yellow)' : 'var(--color-green)'
+            color: badgeStyle[statusClass].color
           }}>
             {latestTemp != null ? `${latestTemp}°C` : '--'}
           </div>

@@ -20,8 +20,10 @@ export default function LineComparison() {
             statsMap[line] = (data.stats || []).map((s) => ({
               ccpId: s.ccpId,
               ccpName: s.ccpName,
-              complianceRate: s.onlineRate,
+              complianceRate: s.complianceRate,
               onlineRate: s.onlineRate,
+              totalReadings: s.totalReadings,
+              normalReadings: s.normalReadings,
             }));
           } catch {
             statsMap[line] = [];

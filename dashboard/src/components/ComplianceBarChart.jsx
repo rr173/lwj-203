@@ -13,6 +13,11 @@ function CustomTooltip({ active, payload }) {
         <span className="custom-tooltip-dot" style={{ background: d.fill }} />
         合规率: {d.complianceRate}%
       </div>
+      {d.normalReadings != null && d.totalReadings != null && (
+        <div className="custom-tooltip-item" style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>
+          正常读数: {d.normalReadings} / {d.totalReadings}
+        </div>
+      )}
       <div className="custom-tooltip-item" style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>
         在线率: {d.onlineRate}%
       </div>
@@ -33,6 +38,8 @@ export default function ComplianceBarChart({ data, title }) {
       name: d.ccpName || d.ccpId,
       complianceRate: parseFloat(d.complianceRate?.toFixed(1) || 0),
       onlineRate: parseFloat(d.onlineRate?.toFixed(1) || 0),
+      normalReadings: d.normalReadings,
+      totalReadings: d.totalReadings,
       fill: getBarColor(d.complianceRate ?? 0),
     }));
   }, [data]);
