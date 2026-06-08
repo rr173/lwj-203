@@ -82,10 +82,28 @@ function broadcastRuleAlert(alert) {
   });
 }
 
+function broadcastReplayStatus(status) {
+  broadcast({
+    type: 'replay_status',
+    id: `replay_${Date.now()}`,
+    data: status,
+  });
+}
+
+function broadcastSimulationStatus(status) {
+  broadcast({
+    type: 'simulation_status',
+    id: `sim_${Date.now()}`,
+    data: status,
+  });
+}
+
 module.exports = {
   initWebSocket,
   broadcast,
   broadcastDeviation,
   broadcastOfflineAlert,
   broadcastRuleAlert,
+  broadcastReplayStatus,
+  broadcastSimulationStatus,
 };

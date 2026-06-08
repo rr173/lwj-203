@@ -2,6 +2,7 @@ const store = require('./store');
 const { handleCCPRecovered } = require('./heartbeatController');
 const { broadcastDeviation } = require('./websocket');
 const { evaluateRulesForCCP } = require('./ruleEngine');
+const { onReadingSaved } = require('./replayEngine');
 
 function determineReadingLevel(temperature, ccp) {
   if (temperature < ccp.criticalMin || temperature > ccp.criticalMax) {
@@ -126,6 +127,12 @@ function submitReadings(req, res) {
         evaluateRulesForCCP(ccpId, savedReading);
       } catch (err) {
         console.error(`[RuleEngine] Error evaluating rules for CCP ${ccpId}:`, err.message);
+      }
+
+      try {
+        onReadingSaved(ccpId, savedReading);
+      } catch (err) {
+        console.error(`[ReplayEngine] Recording callback error for CCP ${ccpId}:`, err.message);
       }
       
       results.push({

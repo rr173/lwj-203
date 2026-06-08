@@ -110,3 +110,99 @@ export function getRuleAlerts(params = {}) {
 export function acknowledgeRuleAlert(id) {
   return fetchJSON(`/api/rule-alerts/${id}/acknowledge`, { method: 'POST' });
 }
+
+export function getAllScenes() {
+  return fetchJSON('/api/scenes');
+}
+
+export function getScene(id) {
+  return fetchJSON(`/api/scenes/${id}`);
+}
+
+export function deleteScene(id) {
+  return fetchJSON(`/api/scenes/${id}`, { method: 'DELETE' });
+}
+
+export function startRecording(ccpId, name) {
+  return fetchJSON('/api/recordings/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ccpId, name }),
+  });
+}
+
+export function stopRecording(ccpId) {
+  return fetchJSON('/api/recordings/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ccpId }),
+  });
+}
+
+export function getRecordingStatus(ccpId) {
+  return fetchJSON(`/api/recordings/status/${ccpId}`);
+}
+
+export function startReplay(sceneId, targetCcpId, speed) {
+  return fetchJSON('/api/replay/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sceneId, targetCcpId, speed }),
+  });
+}
+
+export function pauseReplay(ccpId) {
+  return fetchJSON('/api/replay/pause', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ccpId }),
+  });
+}
+
+export function resumeReplay(ccpId) {
+  return fetchJSON('/api/replay/resume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ccpId }),
+  });
+}
+
+export function stopReplay(ccpId) {
+  return fetchJSON('/api/replay/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ccpId }),
+  });
+}
+
+export function getReplayStatus(ccpId) {
+  return fetchJSON(`/api/replay/status/${ccpId}`);
+}
+
+export function setReplaySpeed(ccpId, speed) {
+  return fetchJSON('/api/replay/speed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ccpId, speed }),
+  });
+}
+
+export function startSimulation(ccpId, mode, config) {
+  return fetchJSON('/api/simulation/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ccpId, mode, config }),
+  });
+}
+
+export function stopSimulation(ccpId) {
+  return fetchJSON('/api/simulation/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ccpId }),
+  });
+}
+
+export function getSimulationStatus(ccpId) {
+  return fetchJSON(`/api/simulation/status/${ccpId}`);
+}

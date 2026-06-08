@@ -15,6 +15,10 @@ class DataStore {
     this.nextActionId = 1;
     this.nextOfflineAlertId = 1;
     this.nextRuleId = 1;
+    this.scenes = new Map();
+    this.nextSceneId = 1;
+    this.nextReplayId = 1;
+    this.nextSimulationId = 1;
     this.nextRuleAlertId = 1;
   }
 
@@ -34,6 +38,12 @@ class DataStore {
         return `RULE${String(this.nextRuleId++).padStart(4, '0')}`;
       case 'ruleAlert':
         return `RAL${String(this.nextRuleAlertId++).padStart(6, '0')}`;
+      case 'scene':
+        return `SCENE${String(this.nextSceneId++).padStart(4, '0')}`;
+      case 'replay':
+        return `RPL${String(this.nextReplayId++).padStart(6, '0')}`;
+      case 'simulation':
+        return `SIM${String(this.nextSimulationId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -290,6 +300,26 @@ class DataStore {
 
   resetRuleEvalState(ruleId) {
     this.ruleEvalState.delete(ruleId);
+  }
+
+  addScene(scene) {
+    const id = this.generateId('scene');
+    const now = new Date().toISOString();
+    const sceneWithId = { ...scene, id, createdAt: now };
+    this.scenes.set(id, sceneWithId);
+    return sceneWithId;
+  }
+
+  getScene(id) {
+    return this.scenes.get(id);
+  }
+
+  getAllScenes() {
+    return Array.from(this.scenes.values());
+  }
+
+  deleteScene(id) {
+    return this.scenes.delete(id);
   }
 }
 

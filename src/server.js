@@ -9,6 +9,7 @@ const reportController = require('./reportController');
 const heartbeatController = require('./heartbeatController');
 const dashboardController = require('./dashboardController');
 const ruleController = require('./ruleController');
+const replayController = require('./replayController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 const { initWebSocket } = require('./websocket');
@@ -60,6 +61,22 @@ app.get('/api/ccps/:ccpId/rules', ruleController.getRulesByCCP);
 app.get('/api/rule-alerts', ruleController.getAllRuleAlerts);
 app.get('/api/rule-alerts/:id', ruleController.getRuleAlert);
 app.post('/api/rule-alerts/:id/acknowledge', ruleController.acknowledgeRuleAlert);
+
+app.get('/api/scenes', replayController.getAllScenes);
+app.get('/api/scenes/:id', replayController.getScene);
+app.delete('/api/scenes/:id', replayController.deleteScene);
+app.post('/api/recordings/start', replayController.startRecording);
+app.post('/api/recordings/stop', replayController.stopRecording);
+app.get('/api/recordings/status/:ccpId', replayController.getRecordingStatus);
+app.post('/api/replay/start', replayController.startReplay);
+app.post('/api/replay/pause', replayController.pauseReplay);
+app.post('/api/replay/resume', replayController.resumeReplay);
+app.post('/api/replay/stop', replayController.stopReplay);
+app.get('/api/replay/status/:ccpId', replayController.getReplayStatus);
+app.post('/api/replay/speed', replayController.setReplaySpeed);
+app.post('/api/simulation/start', replayController.startSimulation);
+app.post('/api/simulation/stop', replayController.stopSimulation);
+app.get('/api/simulation/status/:ccpId', replayController.getSimulationStatus);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

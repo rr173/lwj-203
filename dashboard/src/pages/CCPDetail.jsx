@@ -4,6 +4,7 @@ import TemperatureChart from '../components/TemperatureChart';
 import DeviationTimeline from '../components/DeviationTimeline';
 import OfflineAlarmHistory from '../components/OfflineAlarmHistory';
 import RuleManager from '../components/RuleManager';
+import SimulationPanel from '../components/SimulationPanel';
 import { getCCP, getReadings, getCCPTimeline, getOfflineAlerts } from '../api/client';
 
 const STATUS_TEXT = {
@@ -159,6 +160,10 @@ export default function CCPDetail() {
 
       <div className="chart-section">
         <RuleManager ccpId={ccpId} />
+      </div>
+
+      <div className="chart-section">
+        <SimulationPanel ccpId={ccpId} />
       </div>
     </div>
   );

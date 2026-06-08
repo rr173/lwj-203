@@ -1020,3 +1020,391 @@ body {
   border-radius: var(--radius-sm);
   border: 1px solid rgba(139, 92, 246, 0.15);
 }
+
+.sim-panel {
+  padding: 0;
+}
+
+.sim-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.sim-panel-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sim-active-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(6, 182, 212, 0.15);
+  color: #06b6d4;
+  animation: pulse 1.5s infinite;
+}
+
+.sim-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0;
+}
+
+.sim-tab {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  margin-bottom: -1px;
+}
+
+.sim-tab:hover {
+  color: var(--color-text);
+}
+
+.sim-tab.active {
+  color: #06b6d4;
+  border-bottom-color: #06b6d4;
+}
+
+.sim-section {
+  min-height: 80px;
+}
+
+.sim-error {
+  background: var(--color-red-bg);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--color-red);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.sim-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sim-form-row {
+  margin-bottom: 0;
+}
+
+.sim-form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.sim-form-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.sim-form-input:focus {
+  border-color: #06b6d4;
+}
+
+.sim-form-input-sm {
+  width: 120px;
+}
+
+.sim-form-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 14px;
+  outline: none;
+}
+
+.sim-form-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+.sim-btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sim-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sim-btn-primary {
+  background: #06b6d4;
+  color: #fff;
+}
+
+.sim-btn-primary:hover:not(:disabled) {
+  background: #0891b2;
+}
+
+.sim-btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.sim-btn-secondary:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.sim-btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-red);
+}
+
+.sim-btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.sim-recording-active {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sim-recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--color-red);
+  font-size: 14px;
+}
+
+.sim-rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-red);
+  animation: pulse 1s infinite;
+}
+
+.sim-recording-info {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.sim-replay-active,
+.sim-sim-active {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sim-replay-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sim-replay-scene {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.sim-replay-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.sim-replay-status.playing {
+  background: rgba(6, 182, 212, 0.15);
+  color: #06b6d4;
+}
+
+.sim-replay-status.paused {
+  background: var(--color-yellow-bg);
+  color: var(--color-yellow);
+}
+
+.sim-progress-bar {
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sim-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #06b6d4, #22d3ee);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.sim-progress-text {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.sim-speed-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sim-speed-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-right: 4px;
+}
+
+.sim-speed-btn {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sim-speed-btn:hover {
+  border-color: #06b6d4;
+  color: #06b6d4;
+}
+
+.sim-speed-btn.active {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: #06b6d4;
+  color: #06b6d4;
+}
+
+.sim-replay-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.sim-sim-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sim-sim-mode {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.sim-sim-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.sim-sim-status.running {
+  background: rgba(6, 182, 212, 0.15);
+  color: #06b6d4;
+  animation: pulse 1.5s infinite;
+}
+
+.sim-sim-detail {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.sim-scenes-list {
+  margin-top: 16px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+
+.sim-scenes-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.sim-scene-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sim-scene-item:last-child {
+  border-bottom: none;
+}
+
+.sim-scene-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sim-scene-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sim-scene-meta {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.sim-btn-icon {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.sim-btn-icon:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.sim-btn-icon.delete:hover {
+  color: var(--color-red);
+}
