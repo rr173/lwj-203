@@ -1,13 +1,16 @@
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
 
 const ccpController = require('./ccpController');
 const readingController = require('./readingController');
 const deviationController = require('./deviationController');
 const reportController = require('./reportController');
 const heartbeatController = require('./heartbeatController');
+const dashboardController = require('./dashboardController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
+const { initWebSocket } = require('./websocket');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,19 +46,26 @@ app.get('/api/offline-ccps', heartbeatController.getOfflineCCPs);
 app.get('/api/offline-alerts', heartbeatController.getOfflineAlerts);
 app.get('/api/reports/online-rate', heartbeatController.getOnlineRateStats);
 
+app.get('/api/dashboard/overview', dashboardController.getDashboardOverview);
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: '服务器内部错误' });
 });
 
 generateDemoData();
+
+const server = http.createServer(app);
+initWebSocket(server);
+
 startScheduler();
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`
 ╔══════════════════════════════════════════════════════════════╗
 ║  食品加工产线温控合规记录与偏差管理服务                       ║
 ║  服务已启动: http://localhost:${PORT}                        ║
+║  WebSocket: ws://localhost:${PORT}/ws                        ║
 ║                                                              ║
 ║  API 端点:                                                    ║
 ║  GET    /api/health                                          ║
@@ -77,6 +87,7 @@ app.listen(PORT, () => {
 ║  GET    /api/offline-ccps (当前离线CCP列表)                   ║
 ║  GET    /api/offline-alerts (历史离线告警记录)                ║
 ║  GET    /api/reports/online-rate (CCP在线率统计)              ║
+║  GET    /api/dashboard/overview (监控面板总览)                ║
 ╚══════════════════════════════════════════════════════════════╝
   `);
 });

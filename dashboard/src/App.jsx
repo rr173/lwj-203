@@ -1,0 +1,49 @@
+import { Routes, Route, NavLink } from 'react-router-dom';
+import { useState, useCallback } from 'react';
+import Dashboard from './pages/Dashboard';
+import CCPDetail from './pages/CCPDetail';
+import LineComparison from './pages/LineComparison';
+import AlertBar from './components/AlertBar';
+import { useWebSocket } from './hooks/useWebSocket';
+
+export default function App() {
+  const [alerts, setAlerts] = useState([]);
+
+  const handleWSMessage = useCallback((msg) => {
+    if (msg.type === 'deviation' || msg.type === 'offline_alert') {
+      setAlerts((prev) => [msg, ...prev].slice(0, 50));
+    }
+  }, []);
+
+  const dismissAlert = useCallback((id) => {
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
+  useWebSocket(handleWSMessage);
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <div className="header-left">
+          <h1 className="app-title">温控合规监控面板</h1>
+          <nav className="app-nav">
+            <NavLink to="/" end className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              总览
+            </NavLink>
+            <NavLink to="/comparison" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              产线对比
+            </NavLink>
+          </nav>
+        </div>
+      </header>
+      <AlertBar alerts={alerts} onDismiss={dismissAlert} />
+      <main className="app-main">
+        <Routes>
+          <Route path="/" element={<Dashboard realtimeAlerts={alerts} />} />
+          <Route path="/ccp/:ccpId" element={<CCPDetail />} />
+          <Route path="/comparison" element={<LineComparison />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}

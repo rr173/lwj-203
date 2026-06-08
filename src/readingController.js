@@ -1,5 +1,6 @@
 const store = require('./store');
 const { handleCCPRecovered } = require('./heartbeatController');
+const { broadcastDeviation } = require('./websocket');
 
 function determineReadingLevel(temperature, ccp) {
   if (temperature < ccp.criticalMin || temperature > ccp.criticalMax) {
@@ -23,6 +24,7 @@ function handleStatusTransition(ccp, newStatus, reading) {
     });
     ccp.status = newStatus;
     store.updateCCP(ccp.id, { status: newStatus });
+    broadcastDeviation(deviation);
     return deviation;
   }
 

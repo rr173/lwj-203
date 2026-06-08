@@ -9,3 +9,11 @@ services:
       - NODE_ENV=production
       - PORT=3000
     restart: unless-stopped
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "8080:80"
+    depends_on:
+      - temperature-control-service
+    restart: unless-stopped

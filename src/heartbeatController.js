@@ -1,4 +1,5 @@
 const store = require('./store');
+const { broadcastOfflineAlert } = require('./websocket');
 
 function checkCCPHearbeat(ccp, now) {
   if (!ccp.isActive) {
@@ -24,6 +25,7 @@ function checkCCPHearbeat(ccp, now) {
         expectedIntervalSeconds: ccp.reportingFrequency,
         lastReadingTime: ccp.lastReadingTime
       });
+      broadcastOfflineAlert(alert);
       return { type: 'created', alert };
     }
   }
