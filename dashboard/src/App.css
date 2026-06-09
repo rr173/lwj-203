@@ -2389,3 +2389,33 @@ body {
   border-radius: 3px;
   animation: pulse 1.5s infinite;
 }
+
+.batch-recall-overview-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.batch-recall-overview-status.recalled {
+  background: var(--color-red-bg);
+  color: var(--color-red);
+}
+
+.batch-recall-overview-status.closed {
+  background: var(--color-green-bg);
+  color: var(--color-green);
+}
+
+.batch-recall-overview-item.closed-batch {
+  opacity: 0.75;
+}
+
+.batch-recall-overview-closed {
+  background: var(--color-green);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+}

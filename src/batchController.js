@@ -249,6 +249,20 @@ function addRecallExecution(req, res) {
     return res.status(400).json({ error: '已回收数量必须大于0' });
   }
 
+  const currentSummary = store.getRecallSummaryForBatch(batchId);
+  if (currentSummary && currentSummary.affectedQuantity > 0) {
+    if (affectedQuantity !== currentSummary.affectedQuantity) {
+      return res.status(400).json({ error: `影响数量必须与已有记录一致（${currentSummary.affectedQuantity}件）` });
+    }
+    const remaining = currentSummary.affectedQuantity - currentSummary.totalRecovered;
+    if (remaining <= 0) {
+      return res.status(400).json({ error: '已回收数量已达到影响数量，无需再录入' });
+    }
+    if (recoveredQuantity > remaining) {
+      return res.status(400).json({ error: `本次回收数量超出剩余可回收量（剩余${remaining}件）` });
+    }
+  }
+
   const record = store.addRecallExecution(batchId, {
     reason,
     affectedQuantity,

@@ -656,12 +656,13 @@ export default function BatchManager() {
             {recallOverviewData.map(item => (
               <div
                 key={item.batchId}
-                className={`batch-recall-overview-item ${item.recoveryRate < 0.6 ? 'low-recovery' : ''}`}
+                className={`batch-recall-overview-item ${item.recoveryRate < 0.6 ? 'low-recovery' : ''} ${item.batchStatus === 'closed' ? 'closed-batch' : ''}`}
                 onClick={() => { setShowRecallOverview(false); handleSelectBatch(item.batchId); }}
               >
                 <div className="batch-recall-overview-left">
                   <span className="batch-recall-overview-no">{item.batchNo}</span>
                   <span className="batch-recall-overview-product">{item.productName}</span>
+                  <span className={`batch-recall-overview-status ${STATUS_CLASS[item.batchStatus]}`}>{STATUS_TEXT[item.batchStatus]}</span>
                 </div>
                 <div className="batch-recall-overview-center">
                   <div className="batch-recall-overview-bar-wrap">
@@ -683,10 +684,11 @@ export default function BatchManager() {
                   <span>{item.totalRecovered}/{item.affectedQuantity}件</span>
                   <span>{item.recordCount}条记录</span>
                 </div>
-                {item.recoveryRate < 0.6 && <span className="batch-recall-overview-alert">重点跟踪</span>}
+                {item.batchStatus === 'recalled' && item.recoveryRate < 0.6 && <span className="batch-recall-overview-alert">重点跟踪</span>}
+                {item.batchStatus === 'closed' && <span className="batch-recall-overview-closed">已结案</span>}
               </div>
             ))}
-            {recallOverviewData.length === 0 && <div className="batch-empty">暂无召回中批次</div>}
+            {recallOverviewData.length === 0 && <div className="batch-empty">暂无召回记录</div>}
           </div>
         </div>
       )}

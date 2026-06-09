@@ -423,6 +423,10 @@ class DataStore {
       }
       channelBreakdown[r.channel] += r.recoveredQuantity;
     }
+    totalRecovered = Math.min(totalRecovered, affectedQuantity);
+    for (const ch of Object.keys(channelBreakdown)) {
+      channelBreakdown[ch] = Math.min(channelBreakdown[ch], affectedQuantity);
+    }
     const recoveryRate = affectedQuantity > 0 ? totalRecovered / affectedQuantity : 0;
     return {
       batchId,
@@ -440,7 +444,7 @@ class DataStore {
   }
 
   getRecallOverview() {
-    const recalledBatches = Array.from(this.batches.values()).filter(b => b.status === 'recalled');
+    const recalledBatches = Array.from(this.batches.values()).filter(b => b.status === 'recalled' || b.status === 'closed');
     return recalledBatches.map(b => {
       const summary = this.getRecallSummaryForBatch(b.id);
       return summary || {
