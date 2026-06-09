@@ -1627,6 +1627,11 @@ body {
   color: var(--color-red);
 }
 
+.batch-status-badge.closed {
+  background: var(--color-green-bg);
+  color: var(--color-green);
+}
+
 .batch-card-product {
   font-size: 14px;
   font-weight: 500;
@@ -2066,6 +2071,11 @@ body {
   color: var(--color-red);
 }
 
+.batch-ranking-status.closed {
+  background: var(--color-green-bg);
+  color: var(--color-green);
+}
+
 .batch-ranking-devcount {
   font-size: 12px;
   color: var(--color-text-secondary);
@@ -2085,4 +2095,297 @@ body {
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 3px;
+}
+
+.batch-recall-exec-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.batch-recall-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.batch-recall-progress-label {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.batch-recall-progress-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.batch-recall-progress-bar {
+  flex: 1;
+  height: 12px;
+  background: var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.batch-recall-progress-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+.batch-recall-progress-pct {
+  font-size: 18px;
+  font-weight: 700;
+  min-width: 60px;
+  text-align: right;
+}
+
+.batch-recall-progress-detail {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.batch-recall-closed-badge {
+  background: var(--color-green);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.batch-recall-channels {
+  margin-bottom: 20px;
+}
+
+.batch-recall-channels-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.batch-recall-channels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.batch-recall-channel-item {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.batch-recall-channel-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.batch-recall-channel-qty {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.batch-recall-channel-bar-wrap {
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.batch-recall-channel-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.batch-recall-records {
+  margin-bottom: 20px;
+}
+
+.batch-recall-records-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.batch-recall-records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.batch-recall-record-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.batch-recall-record-item:last-child {
+  border-bottom: none;
+}
+
+.batch-recall-record-left,
+.batch-recall-record-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.batch-recall-record-channel {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--color-primary);
+}
+
+.batch-recall-record-reason {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.batch-recall-record-qty {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-green);
+}
+
+.batch-recall-record-person {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.batch-recall-record-time {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.batch-recall-exec-form {
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+}
+
+.batch-recall-exec-form-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.batch-recall-overview-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-red);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.batch-recall-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.batch-recall-overview-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.batch-recall-overview-item:last-child {
+  border-bottom: none;
+}
+
+.batch-recall-overview-item:hover {
+  background: var(--color-surface-hover);
+}
+
+.batch-recall-overview-item.low-recovery {
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.batch-recall-overview-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.batch-recall-overview-no {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.batch-recall-overview-product {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.batch-recall-overview-center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.batch-recall-overview-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.batch-recall-overview-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.batch-recall-overview-pct {
+  font-size: 16px;
+  font-weight: 700;
+  min-width: 55px;
+  text-align: right;
+}
+
+.batch-recall-overview-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  min-width: 90px;
+}
+
+.batch-recall-overview-alert {
+  background: var(--color-red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+  animation: pulse 1.5s infinite;
 }

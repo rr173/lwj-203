@@ -268,3 +268,19 @@ export function setRecallThreshold(threshold) {
     body: JSON.stringify({ threshold }),
   });
 }
+
+export function addRecallExecution(batchId, data) {
+  return fetchJSON(`/api/batches/${batchId}/recall-executions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export function getRecallSummary(batchId) {
+  return fetchJSON(`/api/batches/${batchId}/recall-summary`);
+}
+
+export function getRecallOverview() {
+  return fetchJSON('/api/recall-overview');
+}

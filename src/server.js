@@ -89,6 +89,9 @@ app.get('/api/batches/:id/risk', batchController.getBatchRiskScore);
 app.post('/api/batches/:id/finish', batchController.finishBatch);
 app.post('/api/batches/:id/release', batchController.releaseBatch);
 app.post('/api/batches/:id/recall', batchController.recallBatch);
+app.post('/api/batches/:id/recall-executions', batchController.addRecallExecution);
+app.get('/api/batches/:id/recall-summary', batchController.getRecallSummary);
+app.get('/api/recall-overview', batchController.getRecallOverview);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

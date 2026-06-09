@@ -140,14 +140,20 @@ function getBatch(req, res) {
   const risk = calculateBatchRiskScore(batch);
   const recommendation = risk.score >= store.getRecallThreshold() ? '建议召回' : '正常';
 
-  res.json({
+  const result = {
     ...batch,
     riskScore: risk.score,
     riskLevel: risk.score >= store.getRecallThreshold() ? 'high' : risk.score >= 30 ? 'medium' : 'low',
     recommendation,
     riskDetails: risk.details,
     linkedDeviations: risk.deviations
-  });
+  };
+
+  if (batch.status === 'recalled' || batch.status === 'closed') {
+    result.recallSummary = store.getRecallSummaryForBatch(batch.id);
+  }
+
+  res.json(result);
 }
 
 function getBatchRiskScore(req, res) {
@@ -215,6 +221,67 @@ function recallBatch(req, res) {
   res.json(updated);
 }
 
+function addRecallExecution(req, res) {
+  const batchId = req.params.id;
+  const batch = store.getBatch(batchId);
+  if (!batch) {
+    return res.status(404).json({ error: '批次不存在' });
+  }
+  if (batch.status === 'closed') {
+    return res.status(400).json({ error: '已结案批次不能再追加回收记录' });
+  }
+  if (batch.status !== 'recalled') {
+    return res.status(400).json({ error: '只有召回状态的批次可以录入回收记录' });
+  }
+
+  const { reason, affectedQuantity, recoveredQuantity, channel, responsiblePerson } = req.body;
+  if (!reason || !affectedQuantity || !recoveredQuantity || !channel || !responsiblePerson) {
+    return res.status(400).json({ error: '召回原因、影响数量、已回收数量、回收渠道和负责人不能为空' });
+  }
+  const validChannels = ['门店退回', '经销商退回', '消费者退回'];
+  if (!validChannels.includes(channel)) {
+    return res.status(400).json({ error: '回收渠道必须为: 门店退回、经销商退回或消费者退回' });
+  }
+  if (affectedQuantity <= 0) {
+    return res.status(400).json({ error: '影响数量必须大于0' });
+  }
+  if (recoveredQuantity <= 0) {
+    return res.status(400).json({ error: '已回收数量必须大于0' });
+  }
+
+  const record = store.addRecallExecution(batchId, {
+    reason,
+    affectedQuantity,
+    recoveredQuantity,
+    channel,
+    responsiblePerson
+  });
+
+  const summary = store.getRecallSummaryForBatch(batchId);
+  let autoClosed = false;
+  if (summary && summary.recoveryRate >= 0.95) {
+    store.updateBatch(batchId, { status: 'closed', closedAt: new Date().toISOString() });
+    autoClosed = true;
+  }
+
+  res.status(201).json({ record, summary, autoClosed });
+}
+
+function getRecallSummary(req, res) {
+  const batchId = req.params.id;
+  const batch = store.getBatch(batchId);
+  if (!batch) {
+    return res.status(404).json({ error: '批次不存在' });
+  }
+  const summary = store.getRecallSummaryForBatch(batchId);
+  res.json(summary);
+}
+
+function getRecallOverview(req, res) {
+  const overview = store.getRecallOverview();
+  res.json(overview);
+}
+
 function getBatchRiskRanking(req, res) {
   const { startTime, endTime, productionLine, limit = 20 } = req.query;
   let batches = store.getAllBatches();
@@ -280,6 +347,9 @@ module.exports = {
   finishBatch,
   releaseBatch,
   recallBatch,
+  addRecallExecution,
+  getRecallSummary,
+  getRecallOverview,
   getBatchRiskRanking,
   getRecallThreshold,
   setRecallThreshold,

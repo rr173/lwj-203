@@ -9,21 +9,26 @@ import {
   recallBatch,
   getBatchRiskRanking,
   getRecallThreshold,
-  setRecallThreshold
+  setRecallThreshold,
+  addRecallExecution,
+  getRecallSummary,
+  getRecallOverview
 } from '../api/client';
 
 const STATUS_TEXT = {
   producing: '生产中',
   pending_inspection: '待检',
   released: '放行',
-  recalled: '召回'
+  recalled: '召回',
+  closed: '已结案'
 };
 
 const STATUS_CLASS = {
   producing: 'producing',
   pending_inspection: 'pending',
   released: 'released',
-  recalled: 'recalled'
+  recalled: 'recalled',
+  closed: 'closed'
 };
 
 function formatDuration(ms) {
@@ -56,6 +61,10 @@ export default function BatchManager() {
   const [thresholdInput, setThresholdInput] = useState('60');
   const [newBatch, setNewBatch] = useState({ batchNo: '', productName: '', productionLine: '', startTime: '' });
   const [createError, setCreateError] = useState('');
+  const [recallExecForm, setRecallExecForm] = useState({ reason: '', affectedQuantity: '', recoveredQuantity: '', channel: '', responsiblePerson: '' });
+  const [recallExecError, setRecallExecError] = useState('');
+  const [recallOverviewData, setRecallOverviewData] = useState([]);
+  const [showRecallOverview, setShowRecallOverview] = useState(false);
 
   const fetchBatches = useCallback(async () => {
     try {
@@ -189,6 +198,41 @@ export default function BatchManager() {
     }
   }, [thresholdInput]);
 
+  const handleAddRecallExec = useCallback(async (batchId) => {
+    setRecallExecError('');
+    const { reason, affectedQuantity, recoveredQuantity, channel, responsiblePerson } = recallExecForm;
+    if (!reason || !affectedQuantity || !recoveredQuantity || !channel || !responsiblePerson) {
+      setRecallExecError('所有字段不能为空');
+      return;
+    }
+    try {
+      const result = await addRecallExecution(batchId, {
+        reason,
+        affectedQuantity: Number(affectedQuantity),
+        recoveredQuantity: Number(recoveredQuantity),
+        channel,
+        responsiblePerson
+      });
+      setRecallExecForm({ reason: '', affectedQuantity: '', recoveredQuantity: '', channel: '', responsiblePerson: '' });
+      handleSelectBatch(batchId);
+      if (result.autoClosed) {
+        fetchBatches();
+      }
+    } catch (err) {
+      setRecallExecError(err.message || '录入失败');
+    }
+  }, [recallExecForm, handleSelectBatch, fetchBatches]);
+
+  const handleFetchRecallOverview = useCallback(async () => {
+    try {
+      const data = await getRecallOverview();
+      setRecallOverviewData(data);
+      setShowRecallOverview(true);
+    } catch (err) {
+      console.error('Failed to fetch recall overview:', err);
+    }
+  }, []);
+
   const riskScoreColor = useMemo(() => (score) => {
     if (score >= threshold) return 'var(--color-red)';
     if (score >= 30) return 'var(--color-yellow)';
@@ -270,6 +314,149 @@ export default function BatchManager() {
             )}
           </div>
         </div>
+
+        {(b.status === 'recalled' || b.status === 'closed') && b.recallSummary && (
+          <div className="batch-recall-exec-section">
+            <h3 className="batch-section-title">召回执行</h3>
+
+            <div className="batch-recall-progress-row">
+              <div className="batch-recall-progress-label">回收进度</div>
+              <div className="batch-recall-progress-bar-wrap">
+                <div className="batch-recall-progress-bar">
+                  <div
+                    className="batch-recall-progress-fill"
+                    style={{
+                      width: `${Math.min(b.recallSummary.recoveryRate * 100, 100)}%`,
+                      background: b.recallSummary.recoveryRate >= 0.95
+                        ? 'var(--color-green)'
+                        : b.recallSummary.recoveryRate >= 0.6
+                          ? 'var(--color-yellow)'
+                          : 'var(--color-red)'
+                    }}
+                  />
+                </div>
+                <span className="batch-recall-progress-pct">
+                  {(b.recallSummary.recoveryRate * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div className="batch-recall-progress-detail">
+                <span>已回收 {b.recallSummary.totalRecovered} 件</span>
+                <span> / 影响 {b.recallSummary.affectedQuantity} 件</span>
+              </div>
+              {b.status === 'closed' && (
+                <span className="batch-recall-closed-badge">已结案</span>
+              )}
+            </div>
+
+            {Object.keys(b.recallSummary.channelBreakdown).length > 0 && (
+              <div className="batch-recall-channels">
+                <div className="batch-recall-channels-title">各渠道回收明细</div>
+                <div className="batch-recall-channels-grid">
+                  {Object.entries(b.recallSummary.channelBreakdown).map(([ch, qty]) => (
+                    <div key={ch} className="batch-recall-channel-item">
+                      <div className="batch-recall-channel-name">{ch}</div>
+                      <div className="batch-recall-channel-qty">{qty} 件</div>
+                      <div className="batch-recall-channel-bar-wrap">
+                        <div
+                          className="batch-recall-channel-bar-fill"
+                          style={{
+                            width: `${b.recallSummary.affectedQuantity > 0 ? (qty / b.recallSummary.affectedQuantity * 100) : 0}%`
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {b.recallSummary.records && b.recallSummary.records.length > 0 && (
+              <div className="batch-recall-records">
+                <div className="batch-recall-records-title">回收记录 ({b.recallSummary.records.length})</div>
+                <div className="batch-recall-records-list">
+                  {b.recallSummary.records.map(rec => (
+                    <div key={rec.id} className="batch-recall-record-item">
+                      <div className="batch-recall-record-left">
+                        <span className="batch-recall-record-channel">{rec.channel}</span>
+                        <span className="batch-recall-record-reason">{rec.reason}</span>
+                      </div>
+                      <div className="batch-recall-record-right">
+                        <span className="batch-recall-record-qty">+{rec.recoveredQuantity}件</span>
+                        <span className="batch-recall-record-person">{rec.responsiblePerson}</span>
+                        <span className="batch-recall-record-time">{formatTime(rec.createdAt)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {b.status === 'recalled' && (
+              <div className="batch-recall-exec-form">
+                <div className="batch-recall-exec-form-title">录入新回收记录</div>
+                {recallExecError && <div className="batch-form-error">{recallExecError}</div>}
+                <div className="batch-form-grid">
+                  <div className="batch-form-field">
+                    <label className="batch-form-label">召回原因</label>
+                    <input
+                      className="batch-form-input"
+                      value={recallExecForm.reason}
+                      onChange={e => setRecallExecForm({ ...recallExecForm, reason: e.target.value })}
+                      placeholder="如: 温度偏差导致质量隐患"
+                    />
+                  </div>
+                  <div className="batch-form-field">
+                    <label className="batch-form-label">影响数量(件)</label>
+                    <input
+                      className="batch-form-input"
+                      type="number"
+                      min="1"
+                      value={recallExecForm.affectedQuantity}
+                      onChange={e => setRecallExecForm({ ...recallExecForm, affectedQuantity: e.target.value })}
+                      placeholder="如: 500"
+                    />
+                  </div>
+                  <div className="batch-form-field">
+                    <label className="batch-form-label">已回收数量(件)</label>
+                    <input
+                      className="batch-form-input"
+                      type="number"
+                      min="1"
+                      value={recallExecForm.recoveredQuantity}
+                      onChange={e => setRecallExecForm({ ...recallExecForm, recoveredQuantity: e.target.value })}
+                      placeholder="如: 100"
+                    />
+                  </div>
+                  <div className="batch-form-field">
+                    <label className="batch-form-label">回收渠道</label>
+                    <select
+                      className="batch-form-select"
+                      value={recallExecForm.channel}
+                      onChange={e => setRecallExecForm({ ...recallExecForm, channel: e.target.value })}
+                    >
+                      <option value="">请选择渠道</option>
+                      <option value="门店退回">门店退回</option>
+                      <option value="经销商退回">经销商退回</option>
+                      <option value="消费者退回">消费者退回</option>
+                    </select>
+                  </div>
+                  <div className="batch-form-field">
+                    <label className="batch-form-label">负责人</label>
+                    <input
+                      className="batch-form-input"
+                      value={recallExecForm.responsiblePerson}
+                      onChange={e => setRecallExecForm({ ...recallExecForm, responsiblePerson: e.target.value })}
+                      placeholder="如: 张三"
+                    />
+                  </div>
+                </div>
+                <div className="batch-form-actions">
+                  <button className="batch-btn batch-btn-primary" onClick={() => handleAddRecallExec(b.id)}>确认录入</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {b.riskDetails && (
           <div className="batch-risk-section">
@@ -368,6 +555,7 @@ export default function BatchManager() {
         <div className="batch-header-actions">
           <button className="batch-btn batch-btn-primary" onClick={() => setShowCreateForm(true)}>新建批次</button>
           <button className="batch-btn batch-btn-secondary" onClick={handleFetchRanking}>风险排行</button>
+          <button className="batch-btn batch-btn-danger" onClick={handleFetchRecallOverview}>召回总览</button>
         </div>
       </div>
 
@@ -378,6 +566,7 @@ export default function BatchManager() {
           <option value="pending_inspection">待检</option>
           <option value="released">放行</option>
           <option value="recalled">召回</option>
+          <option value="closed">已结案</option>
         </select>
         <select className="batch-filter-select" value={filterLine} onChange={e => setFilterLine(e.target.value)}>
           <option value="">全部产线</option>
@@ -453,6 +642,51 @@ export default function BatchManager() {
               </div>
             ))}
             {rankingData.length === 0 && <div className="batch-empty">暂无数据</div>}
+          </div>
+        </div>
+      )}
+
+      {showRecallOverview && (
+        <div className="batch-recall-overview-section">
+          <div className="batch-ranking-header">
+            <h3 className="batch-section-title">召回批次回收进度总览（按回收率升序排列）</h3>
+            <button className="batch-btn batch-btn-sm" onClick={() => setShowRecallOverview(false)}>关闭</button>
+          </div>
+          <div className="batch-recall-overview-list">
+            {recallOverviewData.map(item => (
+              <div
+                key={item.batchId}
+                className={`batch-recall-overview-item ${item.recoveryRate < 0.6 ? 'low-recovery' : ''}`}
+                onClick={() => { setShowRecallOverview(false); handleSelectBatch(item.batchId); }}
+              >
+                <div className="batch-recall-overview-left">
+                  <span className="batch-recall-overview-no">{item.batchNo}</span>
+                  <span className="batch-recall-overview-product">{item.productName}</span>
+                </div>
+                <div className="batch-recall-overview-center">
+                  <div className="batch-recall-overview-bar-wrap">
+                    <div
+                      className="batch-recall-overview-bar-fill"
+                      style={{
+                        width: `${Math.min(item.recoveryRate * 100, 100)}%`,
+                        background: item.recoveryRate >= 0.95
+                          ? 'var(--color-green)'
+                          : item.recoveryRate >= 0.6
+                            ? 'var(--color-yellow)'
+                            : 'var(--color-red)'
+                      }}
+                    />
+                  </div>
+                  <span className="batch-recall-overview-pct">{(item.recoveryRate * 100).toFixed(1)}%</span>
+                </div>
+                <div className="batch-recall-overview-right">
+                  <span>{item.totalRecovered}/{item.affectedQuantity}件</span>
+                  <span>{item.recordCount}条记录</span>
+                </div>
+                {item.recoveryRate < 0.6 && <span className="batch-recall-overview-alert">重点跟踪</span>}
+              </div>
+            ))}
+            {recallOverviewData.length === 0 && <div className="batch-empty">暂无召回中批次</div>}
           </div>
         </div>
       )}

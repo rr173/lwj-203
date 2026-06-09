@@ -23,6 +23,8 @@ class DataStore {
     this.batches = new Map();
     this.nextBatchId = 1;
     this.recallThreshold = 60;
+    this.recallExecutions = new Map();
+    this.nextRecallExecId = 1;
   }
 
   generateId(type) {
@@ -49,6 +51,8 @@ class DataStore {
         return `SIM${String(this.nextSimulationId++).padStart(6, '0')}`;
       case 'batch':
         return `BATCH${String(this.nextBatchId++).padStart(6, '0')}`;
+      case 'recallExec':
+        return `RCLEX${String(this.nextRecallExecId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -373,6 +377,86 @@ class DataStore {
   setRecallThreshold(threshold) {
     this.recallThreshold = threshold;
     return threshold;
+  }
+
+  addRecallExecution(batchId, exec) {
+    const id = this.generateId('recallExec');
+    const now = new Date().toISOString();
+    const record = {
+      id,
+      batchId,
+      reason: exec.reason || '',
+      affectedQuantity: exec.affectedQuantity || 0,
+      recoveredQuantity: exec.recoveredQuantity || 0,
+      channel: exec.channel || '',
+      responsiblePerson: exec.responsiblePerson || '',
+      createdAt: now
+    };
+    this.recallExecutions.set(id, record);
+    return record;
+  }
+
+  getRecallExecution(id) {
+    return this.recallExecutions.get(id);
+  }
+
+  getRecallExecutionsForBatch(batchId) {
+    return Array.from(this.recallExecutions.values()).filter(r => r.batchId === batchId);
+  }
+
+  getAllRecallExecutions() {
+    return Array.from(this.recallExecutions.values());
+  }
+
+  getRecallSummaryForBatch(batchId) {
+    const batch = this.batches.get(batchId);
+    if (!batch) return null;
+    const records = this.getRecallExecutionsForBatch(batchId);
+    let affectedQuantity = 0;
+    let totalRecovered = 0;
+    const channelBreakdown = {};
+    for (const r of records) {
+      affectedQuantity = Math.max(affectedQuantity, r.affectedQuantity);
+      totalRecovered += r.recoveredQuantity;
+      if (!channelBreakdown[r.channel]) {
+        channelBreakdown[r.channel] = 0;
+      }
+      channelBreakdown[r.channel] += r.recoveredQuantity;
+    }
+    const recoveryRate = affectedQuantity > 0 ? totalRecovered / affectedQuantity : 0;
+    return {
+      batchId,
+      batchNo: batch.batchNo,
+      productName: batch.productName,
+      productionLine: batch.productionLine,
+      batchStatus: batch.status,
+      affectedQuantity,
+      totalRecovered,
+      recoveryRate: parseFloat(recoveryRate.toFixed(4)),
+      channelBreakdown,
+      recordCount: records.length,
+      records
+    };
+  }
+
+  getRecallOverview() {
+    const recalledBatches = Array.from(this.batches.values()).filter(b => b.status === 'recalled');
+    return recalledBatches.map(b => {
+      const summary = this.getRecallSummaryForBatch(b.id);
+      return summary || {
+        batchId: b.id,
+        batchNo: b.batchNo,
+        productName: b.productName,
+        productionLine: b.productionLine,
+        batchStatus: b.status,
+        affectedQuantity: 0,
+        totalRecovered: 0,
+        recoveryRate: 0,
+        channelBreakdown: {},
+        recordCount: 0,
+        records: []
+      };
+    }).sort((a, b) => a.recoveryRate - b.recoveryRate);
   }
 
   getDeviationsForBatch(batch) {
