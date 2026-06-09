@@ -20,6 +20,9 @@ class DataStore {
     this.nextReplayId = 1;
     this.nextSimulationId = 1;
     this.nextRuleAlertId = 1;
+    this.batches = new Map();
+    this.nextBatchId = 1;
+    this.recallThreshold = 60;
   }
 
   generateId(type) {
@@ -44,6 +47,8 @@ class DataStore {
         return `RPL${String(this.nextReplayId++).padStart(6, '0')}`;
       case 'simulation':
         return `SIM${String(this.nextSimulationId++).padStart(6, '0')}`;
+      case 'batch':
+        return `BATCH${String(this.nextBatchId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -320,6 +325,65 @@ class DataStore {
 
   deleteScene(id) {
     return this.scenes.delete(id);
+  }
+
+  addBatch(batch) {
+    const id = this.generateId('batch');
+    const now = new Date().toISOString();
+    const batchWithId = {
+      ...batch,
+      id,
+      status: 'producing',
+      startTime: batch.startTime || now,
+      endTime: null,
+      createdAt: now
+    };
+    this.batches.set(id, batchWithId);
+    return batchWithId;
+  }
+
+  getBatch(id) {
+    return this.batches.get(id);
+  }
+
+  getAllBatches() {
+    return Array.from(this.batches.values());
+  }
+
+  getBatchesByProductionLine(line) {
+    return Array.from(this.batches.values()).filter(b => b.productionLine === line);
+  }
+
+  getActiveBatchByLine(line) {
+    return Array.from(this.batches.values()).find(b => b.productionLine === line && b.status === 'producing');
+  }
+
+  updateBatch(id, updates) {
+    const batch = this.batches.get(id);
+    if (!batch) return null;
+    const updated = { ...batch, ...updates };
+    this.batches.set(id, updated);
+    return updated;
+  }
+
+  getRecallThreshold() {
+    return this.recallThreshold;
+  }
+
+  setRecallThreshold(threshold) {
+    this.recallThreshold = threshold;
+    return threshold;
+  }
+
+  getDeviationsForBatch(batch) {
+    const lineCCPIds = this.getCCPsByProductionLine(batch.productionLine).map(c => c.id);
+    const batchStart = new Date(batch.startTime).getTime();
+    const batchEnd = batch.endTime ? new Date(batch.endTime).getTime() : Date.now();
+    return this.getAllDeviations().filter(d => {
+      if (!lineCCPIds.includes(d.ccpId)) return false;
+      const devTime = new Date(d.createdAt).getTime();
+      return devTime >= batchStart && devTime <= batchEnd;
+    });
   }
 }
 

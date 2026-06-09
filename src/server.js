@@ -10,6 +10,7 @@ const heartbeatController = require('./heartbeatController');
 const dashboardController = require('./dashboardController');
 const ruleController = require('./ruleController');
 const replayController = require('./replayController');
+const batchController = require('./batchController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 const { initWebSocket } = require('./websocket');
@@ -77,6 +78,17 @@ app.post('/api/replay/speed', replayController.setReplaySpeed);
 app.post('/api/simulation/start', replayController.startSimulation);
 app.post('/api/simulation/stop', replayController.stopSimulation);
 app.get('/api/simulation/status/:ccpId', replayController.getSimulationStatus);
+
+app.post('/api/batches', batchController.createBatch);
+app.get('/api/batches', batchController.getAllBatches);
+app.get('/api/batches/ranking', batchController.getBatchRiskRanking);
+app.get('/api/batches/threshold', batchController.getRecallThreshold);
+app.put('/api/batches/threshold', batchController.setRecallThreshold);
+app.get('/api/batches/:id', batchController.getBatch);
+app.get('/api/batches/:id/risk', batchController.getBatchRiskScore);
+app.post('/api/batches/:id/finish', batchController.finishBatch);
+app.post('/api/batches/:id/release', batchController.releaseBatch);
+app.post('/api/batches/:id/recall', batchController.recallBatch);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

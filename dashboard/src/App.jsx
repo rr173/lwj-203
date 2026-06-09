@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import Dashboard from './pages/Dashboard';
 import CCPDetail from './pages/CCPDetail';
 import LineComparison from './pages/LineComparison';
+import BatchManager from './pages/BatchManager';
 import AlertBar from './components/AlertBar';
 import { useWebSocket } from './hooks/useWebSocket';
 
@@ -33,6 +34,9 @@ export default function App() {
             <NavLink to="/comparison" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               产线对比
             </NavLink>
+            <NavLink to="/batches" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              批次管理
+            </NavLink>
           </nav>
         </div>
       </header>
@@ -42,6 +46,7 @@ export default function App() {
           <Route path="/" element={<Dashboard realtimeAlerts={alerts} />} />
           <Route path="/ccp/:ccpId" element={<CCPDetail />} />
           <Route path="/comparison" element={<LineComparison />} />
+          <Route path="/batches" element={<BatchManager />} />
         </Routes>
       </main>
     </div>

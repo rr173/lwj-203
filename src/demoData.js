@@ -87,6 +87,8 @@ function generateDemoData() {
   const problematicCCP = createdCCPs[1];
   createDeviationWithEscalation(problematicCCP, now);
 
+  createDemoBatches(now);
+
   console.log('演示数据生成完成');
   console.log(`创建了 ${createdCCPs.length} 个CCP`);
   console.log(`产线: ${store.getAllProductionLines().join(', ')}`);
@@ -141,6 +143,57 @@ function createDeviationWithEscalation(ccp, now) {
 
     console.log(`为 ${ccp.name} 创建了已升级的偏差事件: ${openDeviation.id}`);
   }
+}
+
+function createDemoBatches(now) {
+  const lineA = '产线A-熟食加工';
+  const lineB = '产线B-饮料灌装';
+
+  const twoHoursAgo = now - 2 * 60 * 60 * 1000;
+  const oneHourAgo = now - 60 * 60 * 1000;
+  const fortyMinAgo = now - 40 * 60 * 1000;
+
+  const batchA1 = store.addBatch({
+    batchNo: 'LOT-A-20260609-001',
+    productName: '红烧排骨罐头',
+    productionLine: lineA,
+    startTime: new Date(twoHoursAgo).toISOString()
+  });
+  store.updateBatch(batchA1.id, {
+    status: 'pending_inspection',
+    endTime: new Date(oneHourAgo).toISOString()
+  });
+
+  const batchA2 = store.addBatch({
+    batchNo: 'LOT-A-20260609-002',
+    productName: '卤蛋真空包装',
+    productionLine: lineA,
+    startTime: new Date(oneHourAgo).toISOString()
+  });
+
+  const batchB1 = store.addBatch({
+    batchNo: 'LOT-B-20260609-001',
+    productName: '橙汁无菌灌装',
+    productionLine: lineB,
+    startTime: new Date(twoHoursAgo).toISOString()
+  });
+  store.updateBatch(batchB1.id, {
+    status: 'released',
+    endTime: new Date(fortyMinAgo).toISOString()
+  });
+
+  const batchB2 = store.addBatch({
+    batchNo: 'LOT-B-20260609-002',
+    productName: '绿茶PET瓶灌装',
+    productionLine: lineB,
+    startTime: new Date(fortyMinAgo).toISOString()
+  });
+  store.updateBatch(batchB2.id, {
+    status: 'recalled',
+    endTime: new Date(now - 10 * 60 * 1000).toISOString()
+  });
+
+  console.log(`创建了 ${store.getAllBatches().length} 个批次`);
 }
 
 module.exports = { generateDemoData };

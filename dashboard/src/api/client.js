@@ -206,3 +206,65 @@ export function stopSimulation(ccpId) {
 export function getSimulationStatus(ccpId) {
   return fetchJSON(`/api/simulation/status/${ccpId}`);
 }
+
+export function getBatches(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.status) searchParams.set('status', params.status);
+  if (params.productionLine) searchParams.set('productionLine', params.productionLine);
+  if (params.startTime) searchParams.set('startTime', params.startTime);
+  if (params.endTime) searchParams.set('endTime', params.endTime);
+  if (params.page) searchParams.set('page', params.page);
+  if (params.pageSize) searchParams.set('pageSize', params.pageSize);
+  const qs = searchParams.toString();
+  return fetchJSON(`/api/batches${qs ? `?${qs}` : ''}`);
+}
+
+export function getBatch(id) {
+  return fetchJSON(`/api/batches/${id}`);
+}
+
+export function getBatchRiskScore(id) {
+  return fetchJSON(`/api/batches/${id}/risk`);
+}
+
+export function createBatch(data) {
+  return fetchJSON('/api/batches', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export function finishBatch(id) {
+  return fetchJSON(`/api/batches/${id}/finish`, { method: 'POST' });
+}
+
+export function releaseBatch(id) {
+  return fetchJSON(`/api/batches/${id}/release`, { method: 'POST' });
+}
+
+export function recallBatch(id) {
+  return fetchJSON(`/api/batches/${id}/recall`, { method: 'POST' });
+}
+
+export function getBatchRiskRanking(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.startTime) searchParams.set('startTime', params.startTime);
+  if (params.endTime) searchParams.set('endTime', params.endTime);
+  if (params.productionLine) searchParams.set('productionLine', params.productionLine);
+  if (params.limit) searchParams.set('limit', params.limit);
+  const qs = searchParams.toString();
+  return fetchJSON(`/api/batches/ranking${qs ? `?${qs}` : ''}`);
+}
+
+export function getRecallThreshold() {
+  return fetchJSON('/api/batches/threshold');
+}
+
+export function setRecallThreshold(threshold) {
+  return fetchJSON('/api/batches/threshold', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ threshold }),
+  });
+}
