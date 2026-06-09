@@ -11,6 +11,10 @@ function checkCCPHearbeat(ccp, now) {
   }
 
   if (store.isLineUnderMaintenance(ccp.productionLine, now)) {
+    const openAlert = store.getOpenOfflineAlertForCCP(ccp.id);
+    if (openAlert) {
+      store.resolveOfflineAlert(openAlert.id, new Date(now).toISOString());
+    }
     return null;
   }
 

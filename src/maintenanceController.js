@@ -35,6 +35,19 @@ function createMaintenancePlan(req, res) {
     responsiblePerson
   });
 
+  const now = Date.now();
+  const planStart = new Date(startTime).getTime();
+  const planEnd = new Date(endTime).getTime();
+  if (planStart <= now && planEnd >= now) {
+    const lineCCPs = store.getCCPsByProductionLine(productionLine);
+    for (const ccp of lineCCPs) {
+      const openAlert = store.getOpenOfflineAlertForCCP(ccp.id);
+      if (openAlert) {
+        store.resolveOfflineAlert(openAlert.id, new Date(now).toISOString());
+      }
+    }
+  }
+
   broadcastMaintenanceStatus({
     action: 'created',
     planId: plan.id,
@@ -101,6 +114,19 @@ function updateMaintenancePlan(req, res) {
   }
 
   const updated = store.updateMaintenancePlan(req.params.id, req.body);
+
+  const nowMs = Date.now();
+  const uStart = new Date(updated.startTime).getTime();
+  const uEnd = new Date(updated.endTime).getTime();
+  if (uStart <= nowMs && uEnd >= nowMs) {
+    const lineCCPs = store.getCCPsByProductionLine(updated.productionLine);
+    for (const ccp of lineCCPs) {
+      const openAlert = store.getOpenOfflineAlertForCCP(ccp.id);
+      if (openAlert) {
+        store.resolveOfflineAlert(openAlert.id, new Date(nowMs).toISOString());
+      }
+    }
+  }
 
   broadcastMaintenanceStatus({
     action: 'updated',
