@@ -25,6 +25,10 @@ class DataStore {
     this.recallThreshold = 60;
     this.recallExecutions = new Map();
     this.nextRecallExecId = 1;
+    this.calibrations = new Map();
+    this.nextCalibrationId = 1;
+    this.calibrationAlerts = new Map();
+    this.nextCalibrationAlertId = 1;
   }
 
   generateId(type) {
@@ -53,6 +57,10 @@ class DataStore {
         return `BATCH${String(this.nextBatchId++).padStart(6, '0')}`;
       case 'recallExec':
         return `RCLEX${String(this.nextRecallExecId++).padStart(6, '0')}`;
+      case 'calibration':
+        return `CAL${String(this.nextCalibrationId++).padStart(6, '0')}`;
+      case 'calibrationAlert':
+        return `CALALT${String(this.nextCalibrationAlertId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -473,6 +481,144 @@ class DataStore {
       const devEnd = d.closedAt ? new Date(d.closedAt).getTime() : Date.now();
       return devStart < batchEnd && devEnd > batchStart;
     });
+  }
+
+  addCalibration(ccpId, calibration) {
+    const id = this.generateId('calibration');
+    const now = new Date().toISOString();
+    const record = {
+      id,
+      ccpId,
+      calibrationDate: calibration.calibrationDate || now,
+      standardValue: calibration.standardValue,
+      measuredValue: calibration.measuredValue,
+      deviation: parseFloat((calibration.measuredValue - calibration.standardValue).toFixed(4)),
+      calibratedBy: calibration.calibratedBy || '',
+      nextCalibrationDue: calibration.nextCalibrationDue || null,
+      createdAt: now
+    };
+    this.calibrations.set(id, record);
+
+    if (this.checkDriftAlert(ccpId)) {
+      this.addCalibrationAlert(ccpId, 'drift');
+    }
+
+    return record;
+  }
+
+  getCalibrationsByCCP(ccpId) {
+    return Array.from(this.calibrations.values())
+      .filter(c => c.ccpId === ccpId)
+      .sort((a, b) => new Date(a.calibrationDate).getTime() - new Date(b.calibrationDate).getTime());
+  }
+
+  getCalibration(id) {
+    return this.calibrations.get(id);
+  }
+
+  getAllCalibrations() {
+    return Array.from(this.calibrations.values());
+  }
+
+  checkDriftAlert(ccpId) {
+    const records = this.getCalibrationsByCCP(ccpId);
+    if (records.length < 3) return false;
+    const last3 = records.slice(-3);
+    const absDeviations = last3.map(r => Math.abs(r.deviation));
+    return absDeviations[1] > absDeviations[0] && absDeviations[2] > absDeviations[1];
+  }
+
+  getCCPCalibrationStatus(ccpId) {
+    const records = this.getCalibrationsByCCP(ccpId);
+    if (records.length === 0) {
+      return { status: 'normal', reason: '暂无校准记录', nextDue: null, driftAlert: false };
+    }
+
+    const latest = records[records.length - 1];
+    const nextDue = latest.nextCalibrationDue;
+
+    if (this.checkDriftAlert(ccpId)) {
+      return { status: 'drift_alert', reason: '漂移加剧: 最近3次校准偏差绝对值单调递增', nextDue, driftAlert: true };
+    }
+
+    if (nextDue) {
+      const now = Date.now();
+      const dueMs = new Date(nextDue).getTime();
+      if (dueMs < now) {
+        return { status: 'expired', reason: '校准已过期', nextDue, driftAlert: false };
+      }
+      const daysUntilDue = (dueMs - now) / (1000 * 60 * 60 * 24);
+      if (daysUntilDue <= 7) {
+        return { status: 'expiring_soon', reason: `校准将于${Math.ceil(daysUntilDue)}天后到期`, nextDue, driftAlert: false };
+      }
+    }
+
+    return { status: 'normal', reason: '校准状态正常', nextDue, driftAlert: false };
+  }
+
+  getCalibrationDashboard() {
+    const ccps = this.getAllCCPs();
+    const urgencyOrder = { expired: 0, drift_alert: 1, expiring_soon: 2, normal: 3 };
+    const statusCounts = { normal: 0, expiring_soon: 0, expired: 0, drift_alert: 0 };
+
+    const items = ccps.map(ccp => {
+      const calStatus = this.getCCPCalibrationStatus(ccp.id);
+      const records = this.getCalibrationsByCCP(ccp.id);
+      statusCounts[calStatus.status]++;
+
+      return {
+        ccpId: ccp.id,
+        ccpName: ccp.name,
+        productionLine: ccp.productionLine,
+        calibrationStatus: calStatus.status,
+        calibrationReason: calStatus.reason,
+        nextCalibrationDue: calStatus.nextDue,
+        driftAlert: calStatus.driftAlert,
+        lastCalibrationDate: records.length > 0 ? records[records.length - 1].calibrationDate : null,
+        lastDeviation: records.length > 0 ? records[records.length - 1].deviation : null,
+        calibrationCount: records.length
+      };
+    });
+
+    items.sort((a, b) => urgencyOrder[a.calibrationStatus] - urgencyOrder[b.calibrationStatus]);
+
+    return { items, statusCounts };
+  }
+
+  addCalibrationAlert(ccpId, type) {
+    const existing = Array.from(this.calibrationAlerts.values())
+      .find(a => a.ccpId === ccpId && a.type === type && a.status === 'open');
+    if (existing) return existing;
+
+    const id = this.generateId('calibrationAlert');
+    const now = new Date().toISOString();
+    const ccp = this.ccps.get(ccpId);
+    const alert = {
+      id,
+      ccpId,
+      ccpName: ccp ? ccp.name : '',
+      productionLine: ccp ? ccp.productionLine : '',
+      type,
+      status: 'open',
+      createdAt: now,
+      acknowledgedAt: null
+    };
+    this.calibrationAlerts.set(id, alert);
+    return alert;
+  }
+
+  getCalibrationAlerts(status) {
+    const alerts = Array.from(this.calibrationAlerts.values());
+    if (status) return alerts.filter(a => a.status === status);
+    return alerts;
+  }
+
+  acknowledgeCalibrationAlert(id) {
+    const alert = this.calibrationAlerts.get(id);
+    if (!alert) return null;
+    const updated = { ...alert, status: 'acknowledged', acknowledgedAt: new Date().toISOString() };
+    this.calibrationAlerts.set(id, updated);
+    return updated;
   }
 }
 

@@ -11,6 +11,7 @@ const dashboardController = require('./dashboardController');
 const ruleController = require('./ruleController');
 const replayController = require('./replayController');
 const batchController = require('./batchController');
+const calibrationController = require('./calibrationController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 const { initWebSocket } = require('./websocket');
@@ -92,6 +93,13 @@ app.post('/api/batches/:id/recall', batchController.recallBatch);
 app.post('/api/batches/:id/recall-executions', batchController.addRecallExecution);
 app.get('/api/batches/:id/recall-summary', batchController.getRecallSummary);
 app.get('/api/recall-overview', batchController.getRecallOverview);
+
+app.get('/api/calibration/dashboard', calibrationController.getCalibrationDashboard);
+app.get('/api/calibration/alerts', calibrationController.getCalibrationAlerts);
+app.post('/api/calibration/alerts/:id/acknowledge', calibrationController.acknowledgeCalibrationAlert);
+app.post('/api/ccps/:ccpId/calibrations', calibrationController.addCalibration);
+app.get('/api/ccps/:ccpId/calibrations', calibrationController.getCalibrationsByCCP);
+app.get('/api/ccps/:ccpId/calibration-status', calibrationController.getCCPCalibrationStatus);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

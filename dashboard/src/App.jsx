@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import CCPDetail from './pages/CCPDetail';
 import LineComparison from './pages/LineComparison';
 import BatchManager from './pages/BatchManager';
+import CalibrationManager from './pages/CalibrationManager';
 import AlertBar from './components/AlertBar';
 import { useWebSocket } from './hooks/useWebSocket';
 
@@ -37,6 +38,9 @@ export default function App() {
             <NavLink to="/batches" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               批次管理
             </NavLink>
+            <NavLink to="/calibration" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              校准管理
+            </NavLink>
           </nav>
         </div>
       </header>
@@ -47,6 +51,7 @@ export default function App() {
           <Route path="/ccp/:ccpId" element={<CCPDetail />} />
           <Route path="/comparison" element={<LineComparison />} />
           <Route path="/batches" element={<BatchManager />} />
+          <Route path="/calibration" element={<CalibrationManager />} />
         </Routes>
       </main>
     </div>

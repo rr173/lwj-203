@@ -284,3 +284,32 @@ export function getRecallSummary(batchId) {
 export function getRecallOverview() {
   return fetchJSON('/api/recall-overview');
 }
+
+export function getCalibrationDashboard() {
+  return fetchJSON('/api/calibration/dashboard');
+}
+
+export function getCalibrationAlerts(status) {
+  const params = status ? `?status=${encodeURIComponent(status)}` : '';
+  return fetchJSON(`/api/calibration/alerts${params}`);
+}
+
+export function acknowledgeCalibrationAlert(id) {
+  return fetchJSON(`/api/calibration/alerts/${id}/acknowledge`, { method: 'POST' });
+}
+
+export function addCalibration(ccpId, data) {
+  return fetchJSON(`/api/ccps/${ccpId}/calibrations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export function getCalibrationsByCCP(ccpId) {
+  return fetchJSON(`/api/ccps/${ccpId}/calibrations`);
+}
+
+export function getCCPCalibrationStatus(ccpId) {
+  return fetchJSON(`/api/ccps/${ccpId}/calibration-status`);
+}
