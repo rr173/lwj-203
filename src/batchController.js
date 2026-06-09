@@ -23,8 +23,10 @@ function calculateBatchRiskScore(batch) {
     weightedCount += weight;
     severityDist[dev.level] = (severityDist[dev.level] || 0) + 1;
 
-    const devStartMs = new Date(dev.createdAt).getTime();
-    const devEndMs = dev.closedAt ? new Date(dev.closedAt).getTime() : batchEndMs;
+    const devRawStartMs = new Date(dev.createdAt).getTime();
+    const devRawEndMs = dev.closedAt ? new Date(dev.closedAt).getTime() : batchEndMs;
+    const devStartMs = Math.max(devRawStartMs, batchStartMs);
+    const devEndMs = Math.min(devRawEndMs, batchEndMs);
     const devDurationMs = Math.max(devEndMs - devStartMs, 0);
     totalDeviationMs += devDurationMs;
 

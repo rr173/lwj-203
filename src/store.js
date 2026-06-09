@@ -381,8 +381,9 @@ class DataStore {
     const batchEnd = batch.endTime ? new Date(batch.endTime).getTime() : Date.now();
     return this.getAllDeviations().filter(d => {
       if (!lineCCPIds.includes(d.ccpId)) return false;
-      const devTime = new Date(d.createdAt).getTime();
-      return devTime >= batchStart && devTime <= batchEnd;
+      const devStart = new Date(d.createdAt).getTime();
+      const devEnd = d.closedAt ? new Date(d.closedAt).getTime() : Date.now();
+      return devStart < batchEnd && devEnd > batchStart;
     });
   }
 }
