@@ -24,6 +24,12 @@ const STATUS_CLASS = {
   drift_alert: 'cal-status-drift'
 };
 
+const ALERT_STATUS_TEXT = {
+  open: '待处理',
+  acknowledged: '已确认',
+  auto_resolved: '已自动恢复'
+};
+
 function formatTime(iso) {
   if (!iso) return '--';
   const d = new Date(iso);
@@ -88,7 +94,7 @@ export default function CalibrationManager() {
 
   const fetchAlerts = useCallback(async () => {
     try {
-      const data = await getCalibrationAlerts('open');
+      const data = await getCalibrationAlerts();
       setAlerts(data);
     } catch (err) {
       console.error('Failed to fetch calibration alerts:', err);
@@ -414,18 +420,26 @@ export default function CalibrationManager() {
 
       {alerts.length > 0 && (
         <div className="cal-alerts-section">
-          <h3 className="cal-section-title">漂移告警 ({alerts.length})</h3>
+          <h3 className="cal-section-title">漂移告警记录 ({alerts.length})</h3>
           <div className="cal-alerts-list">
             {alerts.map(alert => (
-              <div key={alert.id} className="cal-alert-item">
+              <div key={alert.id} className={`cal-alert-item cal-alert-${alert.status}`}>
                 <div className="cal-alert-left">
                   <span className="cal-alert-type">漂移告警</span>
                   <span className="cal-alert-ccp">{alert.ccpName}</span>
                   <span className="cal-alert-line">{alert.productionLine}</span>
+                  <span className={`cal-alert-status cal-alert-status-${alert.status}`}>
+                    {ALERT_STATUS_TEXT[alert.status] || alert.status}
+                  </span>
                 </div>
                 <div className="cal-alert-right">
                   <span className="cal-alert-time">{formatTime(alert.createdAt)}</span>
-                  <button className="cal-btn cal-btn-sm" onClick={() => handleAckAlert(alert.id)}>确认</button>
+                  {alert.status === 'auto_resolved' && alert.resolvedAt && (
+                    <span className="cal-alert-resolved-time">恢复于 {formatTime(alert.resolvedAt)}</span>
+                  )}
+                  {alert.status === 'open' && (
+                    <button className="cal-btn cal-btn-sm" onClick={() => handleAckAlert(alert.id)}>确认</button>
+                  )}
                 </div>
               </div>
             ))}

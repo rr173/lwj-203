@@ -501,9 +501,19 @@ class DataStore {
 
     if (this.checkDriftAlert(ccpId)) {
       this.addCalibrationAlert(ccpId, 'drift');
+    } else {
+      this.resolveOpenDriftAlertsForCCP(ccpId);
     }
 
     return record;
+  }
+
+  resolveOpenDriftAlertsForCCP(ccpId) {
+    for (const [id, alert] of this.calibrationAlerts) {
+      if (alert.ccpId === ccpId && alert.type === 'drift' && alert.status === 'open') {
+        this.calibrationAlerts.set(id, { ...alert, status: 'auto_resolved', resolvedAt: new Date().toISOString() });
+      }
+    }
   }
 
   getCalibrationsByCCP(ccpId) {
@@ -536,21 +546,22 @@ class DataStore {
 
     const latest = records[records.length - 1];
     const nextDue = latest.nextCalibrationDue;
-
-    if (this.checkDriftAlert(ccpId)) {
-      return { status: 'drift_alert', reason: '漂移加剧: 最近3次校准偏差绝对值单调递增', nextDue, driftAlert: true };
-    }
+    const isDrift = this.checkDriftAlert(ccpId);
 
     if (nextDue) {
       const now = Date.now();
       const dueMs = new Date(nextDue).getTime();
       if (dueMs < now) {
-        return { status: 'expired', reason: '校准已过期', nextDue, driftAlert: false };
+        return { status: 'expired', reason: isDrift ? '校准已过期且漂移加剧' : '校准已过期', nextDue, driftAlert: isDrift };
       }
       const daysUntilDue = (dueMs - now) / (1000 * 60 * 60 * 24);
       if (daysUntilDue <= 7) {
-        return { status: 'expiring_soon', reason: `校准将于${Math.ceil(daysUntilDue)}天后到期`, nextDue, driftAlert: false };
+        return { status: 'expiring_soon', reason: isDrift ? `校准将于${Math.ceil(daysUntilDue)}天后到期且漂移加剧` : `校准将于${Math.ceil(daysUntilDue)}天后到期`, nextDue, driftAlert: isDrift };
       }
+    }
+
+    if (isDrift) {
+      return { status: 'drift_alert', reason: '漂移加剧: 最近3次校准偏差绝对值单调递增', nextDue, driftAlert: true };
     }
 
     return { status: 'normal', reason: '校准状态正常', nextDue, driftAlert: false };
