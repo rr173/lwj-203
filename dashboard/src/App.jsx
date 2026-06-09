@@ -5,6 +5,7 @@ import CCPDetail from './pages/CCPDetail';
 import LineComparison from './pages/LineComparison';
 import BatchManager from './pages/BatchManager';
 import CalibrationManager from './pages/CalibrationManager';
+import MaintenanceManager from './pages/MaintenanceManager';
 import AlertBar from './components/AlertBar';
 import { useWebSocket } from './hooks/useWebSocket';
 
@@ -12,7 +13,7 @@ export default function App() {
   const [alerts, setAlerts] = useState([]);
 
   const handleWSMessage = useCallback((msg) => {
-    if (msg.type === 'deviation' || msg.type === 'offline_alert' || msg.type === 'rule_alert') {
+    if (msg.type === 'deviation' || msg.type === 'offline_alert' || msg.type === 'rule_alert' || msg.type === 'maintenance_status') {
       setAlerts((prev) => [msg, ...prev].slice(0, 50));
     }
   }, []);
@@ -41,6 +42,9 @@ export default function App() {
             <NavLink to="/calibration" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               校准管理
             </NavLink>
+            <NavLink to="/maintenance" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              维护计划
+            </NavLink>
           </nav>
         </div>
       </header>
@@ -52,6 +56,7 @@ export default function App() {
           <Route path="/comparison" element={<LineComparison />} />
           <Route path="/batches" element={<BatchManager />} />
           <Route path="/calibration" element={<CalibrationManager />} />
+          <Route path="/maintenance" element={<MaintenanceManager />} />
         </Routes>
       </main>
     </div>

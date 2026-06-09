@@ -98,6 +98,14 @@ function broadcastSimulationStatus(status) {
   });
 }
 
+function broadcastMaintenanceStatus(data) {
+  broadcast({
+    type: 'maintenance_status',
+    id: `mnt_${Date.now()}`,
+    data,
+  });
+}
+
 module.exports = {
   initWebSocket,
   broadcast,
@@ -106,4 +114,5 @@ module.exports = {
   broadcastRuleAlert,
   broadcastReplayStatus,
   broadcastSimulationStatus,
+  broadcastMaintenanceStatus,
 };

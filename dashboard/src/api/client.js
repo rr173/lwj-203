@@ -313,3 +313,43 @@ export function getCalibrationsByCCP(ccpId) {
 export function getCCPCalibrationStatus(ccpId) {
   return fetchJSON(`/api/ccps/${ccpId}/calibration-status`);
 }
+
+export function getMaintenancePlans(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.productionLine) searchParams.set('productionLine', encodeURIComponent(params.productionLine));
+  if (params.status) searchParams.set('status', params.status);
+  const qs = searchParams.toString();
+  return fetchJSON(`/api/maintenance-plans${qs ? `?${qs}` : ''}`);
+}
+
+export function getMaintenancePlan(id) {
+  return fetchJSON(`/api/maintenance-plans/${id}`);
+}
+
+export function createMaintenancePlan(data) {
+  return fetchJSON('/api/maintenance-plans', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateMaintenancePlan(id, data) {
+  return fetchJSON(`/api/maintenance-plans/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteMaintenancePlan(id) {
+  return fetchJSON(`/api/maintenance-plans/${id}`, { method: 'DELETE' });
+}
+
+export function getLineMaintenancePlans(productionLine) {
+  return fetchJSON(`/api/maintenance-plans/line/${encodeURIComponent(productionLine)}`);
+}
+
+export function getCurrentlyMaintainedLines() {
+  return fetchJSON('/api/maintenance-active-lines');
+}

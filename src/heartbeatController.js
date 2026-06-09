@@ -10,6 +10,10 @@ function checkCCPHearbeat(ccp, now) {
     return null;
   }
 
+  if (store.isLineUnderMaintenance(ccp.productionLine, now)) {
+    return null;
+  }
+
   const lastReadingTime = new Date(ccp.lastReadingTime).getTime();
   const reportingIntervalMs = ccp.reportingFrequency * 1000;
   const thresholdMs = reportingIntervalMs * 3;

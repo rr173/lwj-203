@@ -18,11 +18,14 @@ function handleStatusTransition(ccp, newStatus, reading) {
   const oldStatus = ccp.status;
   
   if (oldStatus === 'normal' && (newStatus === 'minor' || newStatus === 'critical')) {
+    const isMaintenance = store.isLineUnderMaintenance(ccp.productionLine);
     const deviation = store.addDeviation({
       ccpId: ccp.id,
       level: newStatus,
       initialTemperature: reading.temperature,
-      initialReadingTime: reading.timestamp
+      initialReadingTime: reading.timestamp,
+      isMaintenanceDeviation: isMaintenance,
+      deviationType: isMaintenance ? 'maintenance' : 'normal'
     });
     ccp.status = newStatus;
     store.updateCCP(ccp.id, { status: newStatus });

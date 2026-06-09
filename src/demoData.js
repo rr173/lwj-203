@@ -89,6 +89,8 @@ function generateDemoData() {
 
   createDemoBatches(now);
 
+  createDemoMaintenancePlans(now);
+
   console.log('演示数据生成完成');
   console.log(`创建了 ${createdCCPs.length} 个CCP`);
   console.log(`产线: ${store.getAllProductionLines().join(', ')}`);
@@ -194,6 +196,37 @@ function createDemoBatches(now) {
   });
 
   console.log(`创建了 ${store.getAllBatches().length} 个批次`);
+}
+
+function createDemoMaintenancePlans(now) {
+  const lineA = '产线A-熟食加工';
+  const lineB = '产线B-饮料灌装';
+
+  store.addMaintenancePlan({
+    productionLine: lineA,
+    startTime: new Date(now - 30 * 60 * 1000).toISOString(),
+    endTime: new Date(now + 90 * 60 * 1000).toISOString(),
+    reason: '杀菌釜定期检修保养',
+    responsiblePerson: '王工'
+  });
+
+  store.addMaintenancePlan({
+    productionLine: lineB,
+    startTime: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+    endTime: new Date(now + 26 * 60 * 60 * 1000).toISOString(),
+    reason: '灌装设备年度大修',
+    responsiblePerson: '李工'
+  });
+
+  store.addMaintenancePlan({
+    productionLine: lineA,
+    startTime: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    endTime: new Date(now - 5 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000).toISOString(),
+    reason: '冷却系统故障抢修',
+    responsiblePerson: '赵工'
+  });
+
+  console.log(`创建了 ${store.getAllMaintenancePlans().length} 个维护计划`);
 }
 
 module.exports = { generateDemoData };

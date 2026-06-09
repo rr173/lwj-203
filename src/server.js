@@ -12,6 +12,7 @@ const ruleController = require('./ruleController');
 const replayController = require('./replayController');
 const batchController = require('./batchController');
 const calibrationController = require('./calibrationController');
+const maintenanceController = require('./maintenanceController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 const { initWebSocket } = require('./websocket');
@@ -100,6 +101,14 @@ app.post('/api/calibration/alerts/:id/acknowledge', calibrationController.acknow
 app.post('/api/ccps/:ccpId/calibrations', calibrationController.addCalibration);
 app.get('/api/ccps/:ccpId/calibrations', calibrationController.getCalibrationsByCCP);
 app.get('/api/ccps/:ccpId/calibration-status', calibrationController.getCCPCalibrationStatus);
+
+app.post('/api/maintenance-plans', maintenanceController.createMaintenancePlan);
+app.get('/api/maintenance-plans', maintenanceController.getAllMaintenancePlans);
+app.get('/api/maintenance-plans/:id', maintenanceController.getMaintenancePlan);
+app.put('/api/maintenance-plans/:id', maintenanceController.updateMaintenancePlan);
+app.delete('/api/maintenance-plans/:id', maintenanceController.deleteMaintenancePlan);
+app.get('/api/maintenance-plans/line/:productionLine', maintenanceController.getLinePlans);
+app.get('/api/maintenance-active-lines', maintenanceController.getCurrentlyMaintainedLines);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

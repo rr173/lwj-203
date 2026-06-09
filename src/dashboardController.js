@@ -11,6 +11,7 @@ function getDashboardOverview(req, res) {
 
   const lines = store.getAllProductionLines();
   const lineData = {};
+  const maintainedLines = store.getCurrentlyMaintainedLines();
 
   for (const line of lines) {
     lineData[line] = [];
@@ -72,12 +73,28 @@ function getDashboardOverview(req, res) {
       offline: offlineCount,
     },
     lines: lineData,
+    maintainedLines,
+    maintenanceDetails: maintainedLines.map(line => {
+      const activePlans = store.getActiveMaintenanceForLine(line);
+      return {
+        productionLine: line,
+        plans: activePlans.map(p => ({
+          id: p.id,
+          startTime: p.startTime,
+          endTime: p.endTime,
+          reason: p.reason,
+          responsiblePerson: p.responsiblePerson
+        }))
+      };
+    }),
     openDeviations: openDeviations.map((d) => ({
       id: d.id,
       ccpId: d.ccpId,
       level: d.level,
       createdAt: d.createdAt,
       initialTemperature: d.initialTemperature,
+      isMaintenanceDeviation: d.isMaintenanceDeviation || false,
+      deviationType: d.deviationType || 'normal',
     })),
     recentOfflineAlerts: recentAlerts.map((a) => ({
       id: a.id,

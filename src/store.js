@@ -29,6 +29,8 @@ class DataStore {
     this.nextCalibrationId = 1;
     this.calibrationAlerts = new Map();
     this.nextCalibrationAlertId = 1;
+    this.maintenancePlans = new Map();
+    this.nextMaintenancePlanId = 1;
   }
 
   generateId(type) {
@@ -61,6 +63,8 @@ class DataStore {
         return `CAL${String(this.nextCalibrationId++).padStart(6, '0')}`;
       case 'calibrationAlert':
         return `CALALT${String(this.nextCalibrationAlertId++).padStart(6, '0')}`;
+      case 'maintenancePlan':
+        return `MNT${String(this.nextMaintenancePlanId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -134,7 +138,7 @@ class DataStore {
 
   addDeviation(deviation) {
     const id = this.generateId('deviation');
-    const deviationWithId = { ...deviation, id, status: 'open', createdAt: new Date().toISOString(), escalatedAt: null, closedAt: null, closeReason: null, closedBy: null, actions: [] };
+    const deviationWithId = { ...deviation, id, status: 'open', createdAt: new Date().toISOString(), escalatedAt: null, closedAt: null, closeReason: null, closedBy: null, actions: [], isMaintenanceDeviation: deviation.isMaintenanceDeviation || false, deviationType: deviation.deviationType || 'normal' };
     this.deviations.set(id, deviationWithId);
     return deviationWithId;
   }
@@ -630,6 +634,96 @@ class DataStore {
     const updated = { ...alert, status: 'acknowledged', acknowledgedAt: new Date().toISOString() };
     this.calibrationAlerts.set(id, updated);
     return updated;
+  }
+
+  addMaintenancePlan(plan) {
+    const id = this.generateId('maintenancePlan');
+    const now = new Date().toISOString();
+    const planWithId = {
+      id,
+      productionLine: plan.productionLine,
+      startTime: plan.startTime,
+      endTime: plan.endTime,
+      reason: plan.reason || '',
+      responsiblePerson: plan.responsiblePerson || '',
+      status: 'scheduled',
+      createdAt: now,
+      updatedAt: now
+    };
+    this.maintenancePlans.set(id, planWithId);
+    return planWithId;
+  }
+
+  getMaintenancePlan(id) {
+    return this.maintenancePlans.get(id);
+  }
+
+  getAllMaintenancePlans() {
+    return Array.from(this.maintenancePlans.values());
+  }
+
+  getMaintenancePlansByLine(productionLine) {
+    return Array.from(this.maintenancePlans.values())
+      .filter(p => p.productionLine === productionLine);
+  }
+
+  updateMaintenancePlan(id, updates) {
+    const plan = this.maintenancePlans.get(id);
+    if (!plan) return null;
+    const updated = { ...plan, ...updates, updatedAt: new Date().toISOString() };
+    this.maintenancePlans.set(id, updated);
+    return updated;
+  }
+
+  deleteMaintenancePlan(id) {
+    return this.maintenancePlans.delete(id);
+  }
+
+  isLineUnderMaintenance(productionLine, checkTime) {
+    const time = checkTime || Date.now();
+    return Array.from(this.maintenancePlans.values()).some(p => {
+      if (p.productionLine !== productionLine) return false;
+      const start = new Date(p.startTime).getTime();
+      const end = new Date(p.endTime).getTime();
+      return start <= time && end >= time;
+    });
+  }
+
+  getActiveMaintenanceForLine(productionLine) {
+    const now = Date.now();
+    return Array.from(this.maintenancePlans.values()).filter(p => {
+      if (p.productionLine !== productionLine) return false;
+      const start = new Date(p.startTime).getTime();
+      const end = new Date(p.endTime).getTime();
+      return start <= now && end >= now;
+    });
+  }
+
+  getCurrentlyMaintainedLines() {
+    const now = Date.now();
+    const lines = new Set();
+    for (const plan of this.maintenancePlans.values()) {
+      const start = new Date(plan.startTime).getTime();
+      const end = new Date(plan.endTime).getTime();
+      if (start <= now && end >= now) {
+        lines.add(plan.productionLine);
+      }
+    }
+    return Array.from(lines);
+  }
+
+  getFuturePlansByLine(productionLine) {
+    const now = Date.now();
+    return this.getMaintenancePlansByLine(productionLine)
+      .filter(p => new Date(p.startTime).getTime() > now)
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  }
+
+  getHistoryPlansByLine(productionLine) {
+    const now = Date.now();
+    return this.getMaintenancePlansByLine(productionLine)
+      .filter(p => new Date(p.endTime).getTime() <= now)
+      .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime());
   }
 }
 

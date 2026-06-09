@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import CCPBlock from '../components/CCPBlock';
 import { getDashboardOverview } from '../api/client';
 
@@ -41,6 +42,20 @@ export default function Dashboard({ realtimeAlerts }) {
     return overview.summary;
   }, [overview]);
 
+  const maintainedLines = useMemo(() => {
+    if (!overview || !overview.maintainedLines) return [];
+    return overview.maintainedLines;
+  }, [overview]);
+
+  const maintenanceDetailsMap = useMemo(() => {
+    if (!overview || !overview.maintenanceDetails) return {};
+    const map = {};
+    for (const detail of overview.maintenanceDetails) {
+      map[detail.productionLine] = detail.plans;
+    }
+    return map;
+  }, [overview]);
+
   if (loading) {
     return (
       <div className="dashboard">
@@ -73,19 +88,46 @@ export default function Dashboard({ realtimeAlerts }) {
             <div className="stat-value gray">{stats.offline}</div>
             <div className="stat-label">离线</div>
           </div>
+          {maintainedLines.length > 0 && (
+            <div className="stat-card stat-card-maintenance">
+              <div className="stat-value orange">{maintainedLines.length}</div>
+              <div className="stat-label">维护中</div>
+            </div>
+          )}
         </div>
       </div>
 
-      {Object.entries(grouped).map(([lineName, lineCCPs]) => (
-        <div key={lineName} className="production-line-section">
-          <h3 className="line-title">{lineName}</h3>
-          <div className="ccp-grid">
-            {lineCCPs.map((ccp) => (
-              <CCPBlock key={ccp.id} ccp={ccp} />
-            ))}
+      {Object.entries(grouped).map(([lineName, lineCCPs]) => {
+        const isUnderMaintenance = maintainedLines.includes(lineName);
+        const maintenancePlans = maintenanceDetailsMap[lineName] || [];
+
+        return (
+          <div key={lineName} className={`production-line-section${isUnderMaintenance ? ' under-maintenance' : ''}`}>
+            <div className="line-title-row">
+              <h3 className="line-title">{lineName}</h3>
+              {isUnderMaintenance && (
+                <Link to="/maintenance" className="maintenance-badge-link">
+                  <span className="maintenance-badge">维护中</span>
+                </Link>
+              )}
+            </div>
+            {isUnderMaintenance && maintenancePlans.length > 0 && (
+              <div className="maintenance-info-bar">
+                {maintenancePlans.map(plan => (
+                  <span key={plan.id} className="maintenance-plan-chip">
+                    {plan.reason} | {new Date(plan.startTime).toLocaleString('zh-CN')} ~ {new Date(plan.endTime).toLocaleString('zh-CN')} | 负责人: {plan.responsiblePerson}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="ccp-grid">
+              {lineCCPs.map((ccp) => (
+                <CCPBlock key={ccp.id} ccp={ccp} />
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
