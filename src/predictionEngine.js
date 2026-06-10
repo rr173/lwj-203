@@ -21,6 +21,7 @@ function updateConfig(updates) {
   if (updates.predictMinutes !== undefined) {
     predictionConfig.predictMinutes = Math.max(1, Math.floor(updates.predictMinutes));
   }
+  recomputeAll();
   return getConfig();
 }
 
@@ -120,32 +121,26 @@ function predictForCCP(ccpId) {
   if (slope > 0 && predictedTemp > ccp.complianceMax) {
     alertTriggered = true;
     alertDirection = 'upper';
-    if (slope > 0) {
-      const boundaryTemp = ccp.complianceMax;
-      const currentTemp = slope * lastTimeSec + intercept;
-      if (currentTemp < boundaryTemp) {
-        const secondsToBreach = (boundaryTemp - currentTemp) / slope;
-        const nowMs = Date.now();
-        const lastReadingMs = new Date(recent[recent.length - 1].timestamp).getTime();
-        predictedArrivalTime = new Date(Math.max(nowMs, lastReadingMs) + secondsToBreach * 1000).toISOString();
-      } else {
-        predictedArrivalTime = new Date().toISOString();
-      }
+    const boundaryTemp = ccp.complianceMax;
+    const currentTemp = slope * lastTimeSec + intercept;
+    const lastReadingMs = new Date(recent[recent.length - 1].timestamp).getTime();
+    if (currentTemp < boundaryTemp) {
+      const secondsToBreach = (boundaryTemp - currentTemp) / slope;
+      predictedArrivalTime = new Date(lastReadingMs + secondsToBreach * 1000).toISOString();
+    } else {
+      predictedArrivalTime = new Date(lastReadingMs).toISOString();
     }
   } else if (slope < 0 && predictedTemp < ccp.complianceMin) {
     alertTriggered = true;
     alertDirection = 'lower';
-    if (slope < 0) {
-      const boundaryTemp = ccp.complianceMin;
-      const currentTemp = slope * lastTimeSec + intercept;
-      if (currentTemp > boundaryTemp) {
-        const secondsToBreach = (boundaryTemp - currentTemp) / slope;
-        const nowMs = Date.now();
-        const lastReadingMs = new Date(recent[recent.length - 1].timestamp).getTime();
-        predictedArrivalTime = new Date(Math.max(nowMs, lastReadingMs) + secondsToBreach * 1000).toISOString();
-      } else {
-        predictedArrivalTime = new Date().toISOString();
-      }
+    const boundaryTemp = ccp.complianceMin;
+    const currentTemp = slope * lastTimeSec + intercept;
+    const lastReadingMs = new Date(recent[recent.length - 1].timestamp).getTime();
+    if (currentTemp > boundaryTemp) {
+      const secondsToBreach = (boundaryTemp - currentTemp) / slope;
+      predictedArrivalTime = new Date(lastReadingMs + secondsToBreach * 1000).toISOString();
+    } else {
+      predictedArrivalTime = new Date(lastReadingMs).toISOString();
     }
   }
 
@@ -191,23 +186,13 @@ function getPredictionForCCP(ccpId) {
 
 function getAllAlertingCCPs() {
   const results = [];
-  for (const [ccpId] of predictionState) {
-    const pred = predictionState.get(ccpId);
+  const allCCPs = store.getAllCCPs();
+  for (const ccp of allCCPs) {
+    const pred = predictForCCP(ccp.id);
     if (pred && pred.alertTriggered) {
       results.push(pred);
     }
   }
-
-  const allCCPs = store.getAllCCPs();
-  for (const ccp of allCCPs) {
-    if (!predictionState.has(ccp.id)) {
-      const pred = predictForCCP(ccp.id);
-      if (pred && pred.alertTriggered) {
-        results.push(pred);
-      }
-    }
-  }
-
   return results;
 }
 
