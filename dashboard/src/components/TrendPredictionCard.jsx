@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getCCPPrediction } from '../api/client';
+import { getCCPPrediction, getCCPModelComparison } from '../api/client';
 
 function SlopeArrow({ slope }) {
   if (Math.abs(slope) < 0.0001) {
@@ -11,14 +11,83 @@ function SlopeArrow({ slope }) {
   return <span className="trend-arrow trend-arrow-down">↓</span>;
 }
 
+const MODEL_LABELS = {
+  linear: '线性回归',
+  ema: '指数平滑',
+  ma: '移动平均'
+};
+
+const MODEL_COLORS = {
+  linear: '#3b82f6',
+  ema: '#f59e0b',
+  ma: '#22c55e'
+};
+
+function ModelComparisonSection({ models, recommendedModel }) {
+  if (!models) return null;
+
+  const modelKeys = ['linear', 'ema', 'ma'];
+
+  return (
+    <div className="model-comparison">
+      <div className="model-comparison-title">
+        模型对比
+        <span className="model-comparison-recommend-label">
+          推荐: {MODEL_LABELS[recommendedModel] || recommendedModel}
+        </span>
+      </div>
+      <div className="model-comparison-grid">
+        {modelKeys.map(key => {
+          const model = models[key];
+          if (!model) return null;
+          const isRecommended = model.isRecommended;
+          return (
+            <div
+              key={key}
+              className={`model-comparison-card ${isRecommended ? 'model-comparison-recommended' : ''}`}
+              style={{ '--model-color': MODEL_COLORS[key] }}
+            >
+              <div className="model-comparison-card-header">
+                <span className="model-comparison-model-name">{model.name}</span>
+                {isRecommended && (
+                  <span className="model-comparison-recommended-badge">推荐</span>
+                )}
+              </div>
+              <div className="model-comparison-card-body">
+                <div className="model-comparison-pred">
+                  <span className="model-comparison-pred-label">预测温度</span>
+                  <span className="model-comparison-pred-value">
+                    {model.predictedTemperature !== null ? `${model.predictedTemperature}°C` : '--'}
+                  </span>
+                </div>
+                <div className="model-comparison-mae">
+                  <span className="model-comparison-mae-label">MAE</span>
+                  <span className="model-comparison-mae-value">
+                    {model.mae !== null ? model.mae.toFixed(4) : '--'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function TrendPredictionCard({ ccpId }) {
   const [prediction, setPrediction] = useState(null);
+  const [modelComparison, setModelComparison] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchPrediction = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const data = await getCCPPrediction(ccpId);
-      setPrediction(data);
+      const [predData, compData] = await Promise.all([
+        getCCPPrediction(ccpId),
+        getCCPModelComparison(ccpId)
+      ]);
+      setPrediction(predData);
+      setModelComparison(compData);
     } catch (err) {
       console.error('Failed to fetch prediction:', err);
     } finally {
@@ -27,10 +96,10 @@ export default function TrendPredictionCard({ ccpId }) {
   }, [ccpId]);
 
   useEffect(() => {
-    fetchPrediction();
-    const interval = setInterval(fetchPrediction, 10000);
+    fetchData();
+    const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
-  }, [fetchPrediction]);
+  }, [fetchData]);
 
   if (loading) {
     return (
@@ -124,8 +193,13 @@ export default function TrendPredictionCard({ ccpId }) {
             </div>
           )}
 
+          <ModelComparisonSection
+            models={prediction.models}
+            recommendedModel={prediction.recommendedModel}
+          />
+
           <div className="trend-prediction-footer">
-            基于 {prediction.sampleCount} 条最近读数
+            基于 {prediction.sampleCount} 条最近读数 · 推荐模型: {MODEL_LABELS[prediction.recommendedModel] || prediction.recommendedModel}
           </div>
         </div>
       )}

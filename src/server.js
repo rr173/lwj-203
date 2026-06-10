@@ -112,9 +112,11 @@ app.get('/api/maintenance-plans/line/:productionLine', maintenanceController.get
 app.get('/api/maintenance-active-lines', maintenanceController.getCurrentlyMaintainedLines);
 
 app.get('/api/ccps/:ccpId/prediction', predictionController.getCCPPrediction);
+app.get('/api/ccps/:ccpId/prediction/models', predictionController.getCCPModelComparison);
 app.get('/api/prediction/alerts', predictionController.getAlertingCCPs);
 app.get('/api/prediction/config', predictionController.getPredictionConfig);
 app.put('/api/prediction/config', predictionController.setPredictionConfig);
+app.get('/api/prediction/model-distribution', predictionController.getModelDistributionStats);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

@@ -373,3 +373,11 @@ export function setPredictionConfig(config) {
     body: JSON.stringify(config),
   });
 }
+
+export function getCCPModelComparison(ccpId) {
+  return fetchJSON(`/api/ccps/${ccpId}/prediction/models`);
+}
+
+export function getModelDistribution() {
+  return fetchJSON('/api/prediction/model-distribution');
+}

@@ -3544,3 +3544,107 @@ body {
   padding-top: 8px;
   border-top: 1px solid var(--color-border);
 }
+
+.model-comparison {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.model-comparison-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.model-comparison-recommend-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.model-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.model-comparison-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  border-top: 3px solid var(--model-color, var(--color-border));
+  transition: all 0.2s;
+}
+
+.model-comparison-card.model-comparison-recommended {
+  border-color: var(--model-color, var(--color-primary));
+  box-shadow: 0 0 0 1px var(--model-color, var(--color-primary)), 0 0 12px rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.model-comparison-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.model-comparison-model-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--model-color, var(--color-text));
+}
+
+.model-comparison-recommended-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--model-color, var(--color-primary));
+  color: #fff;
+}
+
+.model-comparison-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.model-comparison-pred,
+.model-comparison-mae {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.model-comparison-pred-label,
+.model-comparison-mae-label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.model-comparison-pred-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.model-comparison-mae-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.model-comparison-card.model-comparison-recommended .model-comparison-pred-value {
+  color: var(--model-color, var(--color-primary));
+}
+
+.model-comparison-card.model-comparison-recommended .model-comparison-mae-value {
+  color: var(--model-color, var(--color-primary));
+}
