@@ -126,6 +126,45 @@ function broadcastMaintenanceStatus(data) {
   });
 }
 
+function broadcastGroupAlert(alert) {
+  broadcast({
+    type: 'group_alert',
+    id: `grp_${alert.id}_${Date.now()}`,
+    data: {
+      id: alert.id,
+      groupId: alert.groupId,
+      groupName: alert.groupName,
+      productionLine: alert.productionLine,
+      status: alert.status,
+      deviatingCCPIds: alert.deviatingCCPIds,
+      deviatingCCPDetails: alert.deviatingCCPDetails,
+      thresholdCount: alert.thresholdCount,
+      triggeredAt: alert.triggeredAt,
+      resolvedAt: alert.resolvedAt,
+      durationMs: alert.durationMs,
+      wasEscalated: alert.wasEscalated,
+    },
+  });
+}
+
+function broadcastGroupEscalation(alert) {
+  broadcast({
+    type: 'group_escalation',
+    id: `grpe_${alert.id}_${Date.now()}`,
+    data: {
+      id: alert.id,
+      groupId: alert.groupId,
+      groupName: alert.groupName,
+      productionLine: alert.productionLine,
+      status: alert.status,
+      deviatingCCPIds: alert.deviatingCCPIds,
+      deviatingCCPDetails: alert.deviatingCCPDetails,
+      triggeredAt: alert.triggeredAt,
+      escalatedAt: alert.escalatedAt,
+    },
+  });
+}
+
 module.exports = {
   initWebSocket,
   broadcast,
@@ -136,4 +175,6 @@ module.exports = {
   broadcastSimulationStatus,
   broadcastPredictionAlert,
   broadcastMaintenanceStatus,
+  broadcastGroupAlert,
+  broadcastGroupEscalation,
 };

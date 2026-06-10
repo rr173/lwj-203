@@ -43,6 +43,10 @@ class DataStore {
       baselineWindowHours: 24,
       correlationThreshold: 0.8
     };
+    this.ccpGroups = new Map();
+    this.nextCCPGroupId = 1;
+    this.groupAlerts = new Map();
+    this.nextGroupAlertId = 1;
   }
 
   generateId(type) {
@@ -81,6 +85,10 @@ class DataStore {
         return this.nextPowerReadingId++;
       case 'energyAnomaly':
         return `ENA${String(this.nextEnergyAnomalyId++).padStart(6, '0')}`;
+      case 'ccpGroup':
+        return `GRP${String(this.nextCCPGroupId++).padStart(4, '0')}`;
+      case 'groupAlert':
+        return `GA${String(this.nextGroupAlertId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -904,6 +912,187 @@ class DataStore {
   updateEnergyConfig(config) {
     this.energyConfig = { ...this.energyConfig, ...config };
     return this.getEnergyConfig();
+  }
+
+  addCCPGroup(group) {
+    const id = this.generateId('ccpGroup');
+    const now = new Date().toISOString();
+    const groupWithId = {
+      id,
+      name: group.name,
+      productionLine: group.productionLine,
+      ccpIds: group.ccpIds || [],
+      rule: {
+        thresholdCount: group.rule?.thresholdCount || 2,
+        escalationMinutes: group.rule?.escalationMinutes || 30
+      },
+      createdAt: now,
+      updatedAt: now
+    };
+    this.ccpGroups.set(id, groupWithId);
+    return groupWithId;
+  }
+
+  getCCPGroup(id) {
+    return this.ccpGroups.get(id);
+  }
+
+  getAllCCPGroups() {
+    return Array.from(this.ccpGroups.values());
+  }
+
+  getCCPGroupsByProductionLine(productionLine) {
+    return Array.from(this.ccpGroups.values()).filter(g => g.productionLine === productionLine);
+  }
+
+  getCCPGroupsForCCP(ccpId) {
+    return Array.from(this.ccpGroups.values()).filter(g => g.ccpIds.includes(ccpId));
+  }
+
+  updateCCPGroup(id, updates) {
+    const group = this.ccpGroups.get(id);
+    if (!group) return null;
+    const updated = {
+      ...group,
+      name: updates.name !== undefined ? updates.name : group.name,
+      ccpIds: updates.ccpIds !== undefined ? updates.ccpIds : group.ccpIds,
+      rule: updates.rule ? { ...group.rule, ...updates.rule } : group.rule,
+      updatedAt: new Date().toISOString()
+    };
+    this.ccpGroups.set(id, updated);
+    return updated;
+  }
+
+  deleteCCPGroup(id) {
+    return this.ccpGroups.delete(id);
+  }
+
+  addGroupAlert(alert) {
+    const id = this.generateId('groupAlert');
+    const now = new Date().toISOString();
+    const alertWithId = {
+      id,
+      groupId: alert.groupId,
+      groupName: alert.groupName,
+      productionLine: alert.productionLine,
+      status: 'active',
+      deviatingCCPIds: alert.deviatingCCPIds || [],
+      deviatingCCPDetails: alert.deviatingCCPDetails || [],
+      thresholdCount: alert.thresholdCount,
+      triggeredAt: now,
+      escalatedAt: null,
+      resolvedAt: null,
+      durationMs: null,
+      wasEscalated: false
+    };
+    this.groupAlerts.set(id, alertWithId);
+    return alertWithId;
+  }
+
+  getGroupAlert(id) {
+    return this.groupAlerts.get(id);
+  }
+
+  getAllGroupAlerts() {
+    return Array.from(this.groupAlerts.values());
+  }
+
+  getActiveGroupAlertForGroup(groupId) {
+    return Array.from(this.groupAlerts.values()).find(a => a.groupId === groupId && a.status === 'active');
+  }
+
+  getGroupAlertsByGroup(groupId) {
+    return Array.from(this.groupAlerts.values()).filter(a => a.groupId === groupId);
+  }
+
+  getGroupAlertsByProductionLine(productionLine) {
+    return Array.from(this.groupAlerts.values()).filter(a => a.productionLine === productionLine);
+  }
+
+  getActiveGroupAlerts() {
+    return Array.from(this.groupAlerts.values()).filter(a => a.status === 'active');
+  }
+
+  updateGroupAlert(id, updates) {
+    const alert = this.groupAlerts.get(id);
+    if (!alert) return null;
+    const updated = { ...alert, ...updates };
+    this.groupAlerts.set(id, updated);
+    return updated;
+  }
+
+  escalateGroupAlert(id) {
+    const alert = this.groupAlerts.get(id);
+    if (!alert || alert.status !== 'active') return null;
+    const now = new Date().toISOString();
+    const updated = {
+      ...alert,
+      status: 'escalated',
+      escalatedAt: now,
+      wasEscalated: true
+    };
+    this.groupAlerts.set(id, updated);
+    return updated;
+  }
+
+  resolveGroupAlert(id) {
+    const alert = this.groupAlerts.get(id);
+    if (!alert || (alert.status !== 'active' && alert.status !== 'escalated')) return null;
+    const now = new Date().toISOString();
+    const triggeredMs = new Date(alert.triggeredAt).getTime();
+    const resolvedMs = new Date(now).getTime();
+    const durationMs = Math.max(0, resolvedMs - triggeredMs);
+    const updated = {
+      ...alert,
+      status: 'resolved',
+      resolvedAt: now,
+      durationMs
+    };
+    this.groupAlerts.set(id, updated);
+    return updated;
+  }
+
+  getGroupHealthStatus(groupId) {
+    const group = this.ccpGroups.get(groupId);
+    if (!group) return null;
+
+    const activeAlert = this.getActiveGroupAlertForGroup(groupId);
+    const ccpStatuses = group.ccpIds.map(ccpId => {
+      const ccp = this.ccps.get(ccpId);
+      if (!ccp) return { ccpId, name: '(已删除)', status: 'unknown', isDeviating: false };
+      const openDeviation = this.getOpenDeviationForCCP(ccpId);
+      return {
+        ccpId,
+        name: ccp.name,
+        status: ccp.status,
+        isDeviating: openDeviation !== null && openDeviation !== undefined,
+        deviationLevel: openDeviation ? openDeviation.level : null
+      };
+    });
+
+    const deviatingCount = ccpStatuses.filter(c => c.isDeviating).length;
+
+    let healthStatus = 'normal';
+    if (activeAlert && activeAlert.status === 'escalated') {
+      healthStatus = 'escalated';
+    } else if (activeAlert && activeAlert.status === 'active') {
+      healthStatus = 'alerting';
+    }
+
+    return {
+      groupId: group.id,
+      groupName: group.name,
+      productionLine: group.productionLine,
+      healthStatus,
+      totalCCPCount: group.ccpIds.length,
+      deviatingCount,
+      thresholdCount: group.rule.thresholdCount,
+      escalationMinutes: group.rule.escalationMinutes,
+      activeAlertId: activeAlert ? activeAlert.id : null,
+      activeAlertTriggeredAt: activeAlert ? activeAlert.triggeredAt : null,
+      activeAlertEscalatedAt: activeAlert ? activeAlert.escalatedAt : null,
+      ccpStatuses
+    };
   }
 }
 

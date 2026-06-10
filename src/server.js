@@ -15,6 +15,7 @@ const calibrationController = require('./calibrationController');
 const maintenanceController = require('./maintenanceController');
 const predictionController = require('./predictionController');
 const energyController = require('./energyController');
+const groupController = require('./groupController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 const { initWebSocket } = require('./websocket');
@@ -136,6 +137,16 @@ app.post('/api/energy-anomalies/:id/acknowledge', energyController.acknowledgeEn
 
 app.get('/api/energy/config', energyController.getEnergyConfig);
 app.put('/api/energy/config', energyController.updateEnergyConfig);
+
+app.post('/api/ccp-groups', groupController.createCCPGroup);
+app.get('/api/ccp-groups', groupController.getAllCCPGroups);
+app.get('/api/ccp-groups/:id', groupController.getCCPGroup);
+app.put('/api/ccp-groups/:id', groupController.updateCCPGroup);
+app.delete('/api/ccp-groups/:id', groupController.deleteCCPGroup);
+app.get('/api/ccp-groups/:id/health', groupController.getGroupHealth);
+app.get('/api/ccp-groups/:id/ccp-summary', groupController.getGroupCCPSummary);
+app.get('/api/group-alerts', groupController.getGroupAlertHistory);
+app.get('/api/group-alerts/:alertId', groupController.getGroupAlertDetail);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

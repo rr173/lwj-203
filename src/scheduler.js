@@ -1,12 +1,14 @@
 const { checkAndEscalateDeviations } = require('./deviationController');
 const { checkAllCCPsHeartbeat, getMinReportingFrequency } = require('./heartbeatController');
 const { runEnergyAnomalyDetectionForAll, recalculateAllCorrelations } = require('./energyController');
+const { checkAndEscalateGroupAlerts } = require('./groupAlertEngine');
 
 const DEVIATION_CHECK_INTERVAL = 10 * 1000;
 const HEARTBEAT_BASE_INTERVAL = 1000;
 const MIN_HEARTBEAT_INTERVAL = 1000;
 const ENERGY_ANOMALY_CHECK_INTERVAL = 5 * 60 * 1000;
 const CORRELATION_RECALC_INTERVAL = 30 * 60 * 1000;
+const GROUP_ESCALATION_CHECK_INTERVAL = 10 * 1000;
 
 function startScheduler() {
   console.log(`启动偏差升级定时检查服务，间隔: ${DEVIATION_CHECK_INTERVAL / 1000}秒`);
@@ -52,6 +54,19 @@ function startScheduler() {
       console.error('产线相关性重算出错:', error);
     }
   }, CORRELATION_RECALC_INTERVAL);
+
+  console.log(`启动CCP分组级联告警升级检查服务，间隔: ${GROUP_ESCALATION_CHECK_INTERVAL / 1000}秒`);
+  setInterval(() => {
+    try {
+      const escalated = checkAndEscalateGroupAlerts();
+      if (escalated.length > 0) {
+        console.log(`[${new Date().toISOString()}] 升级了 ${escalated.length} 个组级告警至产线级:`);
+        escalated.forEach(a => console.log(`  - ${a.id} (组: ${a.groupName}, 产线: ${a.productionLine})`));
+      }
+    } catch (error) {
+      console.error('组级告警升级检查出错:', error);
+    }
+  }, GROUP_ESCALATION_CHECK_INTERVAL);
 
   startHeartbeatScheduler();
 }

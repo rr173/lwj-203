@@ -1,4 +1,5 @@
 const store = require('./store');
+const { evaluateGroupForCCP } = require('./groupAlertEngine');
 
 function getAllDeviations(req, res) {
   const { status, ccpId, productionLine, startTime, endTime, page = 1, pageSize = 20 } = req.query;
@@ -104,6 +105,12 @@ function closeDeviation(req, res) {
   const ccp = store.getCCP(deviation.ccpId);
   if (ccp && ccp.status !== 'normal') {
     store.updateCCP(deviation.ccpId, { status: 'normal' });
+  }
+
+  try {
+    evaluateGroupForCCP(deviation.ccpId);
+  } catch (err) {
+    console.error(`[GroupAlert] Error evaluating group for CCP ${deviation.ccpId}:`, err.message);
   }
 
   res.json(updated);

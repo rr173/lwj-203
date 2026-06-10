@@ -5,6 +5,7 @@ const { evaluateRulesForCCP } = require('./ruleEngine');
 const { onReadingSaved } = require('./replayEngine');
 const { runPrediction } = require('./predictionEngine');
 const { checkEnergyAnomaly } = require('./energyController');
+const { evaluateGroupForCCP } = require('./groupAlertEngine');
 
 function determineReadingLevel(temperature, ccp) {
   if (temperature < ccp.criticalMin || temperature > ccp.criticalMax) {
@@ -33,6 +34,11 @@ function handleStatusTransition(ccp, newStatus, reading) {
     ccp.status = newStatus;
     store.updateCCP(ccp.id, { status: newStatus });
     broadcastDeviation(deviation);
+    try {
+      evaluateGroupForCCP(ccp.id);
+    } catch (err) {
+      console.error(`[GroupAlert] Error evaluating group for CCP ${ccp.id}:`, err.message);
+    }
     return deviation;
   }
 
@@ -48,6 +54,11 @@ function handleStatusTransition(ccp, newStatus, reading) {
     }
     ccp.status = 'normal';
     store.updateCCP(ccp.id, { status: 'normal' });
+    try {
+      evaluateGroupForCCP(ccp.id);
+    } catch (err) {
+      console.error(`[GroupAlert] Error evaluating group for CCP ${ccp.id}:`, err.message);
+    }
   }
 
   if (oldStatus === 'minor' && newStatus === 'critical') {
