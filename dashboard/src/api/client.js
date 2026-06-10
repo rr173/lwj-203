@@ -353,3 +353,23 @@ export function getLineMaintenancePlans(productionLine) {
 export function getCurrentlyMaintainedLines() {
   return fetchJSON('/api/maintenance-active-lines');
 }
+
+export function getCCPPrediction(ccpId) {
+  return fetchJSON(`/api/ccps/${ccpId}/prediction`);
+}
+
+export function getPredictionAlerts() {
+  return fetchJSON('/api/prediction/alerts');
+}
+
+export function getPredictionConfig() {
+  return fetchJSON('/api/prediction/config');
+}
+
+export function setPredictionConfig(config) {
+  return fetchJSON('/api/prediction/config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+}

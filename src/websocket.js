@@ -98,6 +98,26 @@ function broadcastSimulationStatus(status) {
   });
 }
 
+function broadcastPredictionAlert(prediction) {
+  broadcast({
+    type: 'prediction_alert',
+    id: `pred_${prediction.ccpId}_${Date.now()}`,
+    data: {
+      ccpId: prediction.ccpId,
+      ccpName: prediction.ccpName,
+      slope: prediction.slope,
+      r2: prediction.r2,
+      predictedTemperature: prediction.predictedTemperature,
+      alertDirection: prediction.alertDirection,
+      predictedArrivalTime: prediction.predictedArrivalTime,
+      predictMinutes: prediction.predictMinutes,
+      complianceMin: prediction.complianceMin,
+      complianceMax: prediction.complianceMax,
+      sampleCount: prediction.sampleCount
+    },
+  });
+}
+
 function broadcastMaintenanceStatus(data) {
   broadcast({
     type: 'maintenance_status',
@@ -114,5 +134,6 @@ module.exports = {
   broadcastRuleAlert,
   broadcastReplayStatus,
   broadcastSimulationStatus,
+  broadcastPredictionAlert,
   broadcastMaintenanceStatus,
 };

@@ -13,7 +13,7 @@ export default function App() {
   const [alerts, setAlerts] = useState([]);
 
   const handleWSMessage = useCallback((msg) => {
-    if (msg.type === 'deviation' || msg.type === 'offline_alert' || msg.type === 'rule_alert' || msg.type === 'maintenance_status') {
+    if (msg.type === 'deviation' || msg.type === 'offline_alert' || msg.type === 'rule_alert' || msg.type === 'maintenance_status' || msg.type === 'prediction_alert') {
       setAlerts((prev) => [msg, ...prev].slice(0, 50));
     }
   }, []);

@@ -13,6 +13,7 @@ const replayController = require('./replayController');
 const batchController = require('./batchController');
 const calibrationController = require('./calibrationController');
 const maintenanceController = require('./maintenanceController');
+const predictionController = require('./predictionController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 const { initWebSocket } = require('./websocket');
@@ -109,6 +110,11 @@ app.put('/api/maintenance-plans/:id', maintenanceController.updateMaintenancePla
 app.delete('/api/maintenance-plans/:id', maintenanceController.deleteMaintenancePlan);
 app.get('/api/maintenance-plans/line/:productionLine', maintenanceController.getLinePlans);
 app.get('/api/maintenance-active-lines', maintenanceController.getCurrentlyMaintainedLines);
+
+app.get('/api/ccps/:ccpId/prediction', predictionController.getCCPPrediction);
+app.get('/api/prediction/alerts', predictionController.getAlertingCCPs);
+app.get('/api/prediction/config', predictionController.getPredictionConfig);
+app.put('/api/prediction/config', predictionController.setPredictionConfig);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

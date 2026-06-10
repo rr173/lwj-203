@@ -4,6 +4,7 @@ const TYPE_CONFIG = {
   deviation: { label: '偏差', className: 'deviation', icon: '⚠' },
   offline_alert: { label: '离线', className: 'offline', icon: '📡' },
   rule_alert: { label: '规则', className: 'rule', icon: '🔔' },
+  prediction_alert: { label: '预测预警', className: 'prediction', icon: '🔮' },
 };
 
 function RuleEvidence({ evidence }) {
@@ -58,6 +59,7 @@ export default function AlertBar({ alerts, onDismiss }) {
         const typeConfig = TYPE_CONFIG[alert.type] || TYPE_CONFIG.deviation;
         const isRuleAlert = alert.type === 'rule_alert';
         const isOffline = alert.type === 'offline_alert';
+        const isPrediction = alert.type === 'prediction_alert';
 
         let message = '';
         if (isRuleAlert) {
@@ -66,6 +68,9 @@ export default function AlertBar({ alerts, onDismiss }) {
           message = `${alert.data?.ccpId} ${ruleLabel}: ${alert.data?.ruleName}`;
         } else if (isOffline) {
           message = `${alert.data?.ccpName || alert.data?.ccpId} 传感器离线`;
+        } else if (isPrediction) {
+          const dir = alert.data?.alertDirection === 'upper' ? '上升' : '下降';
+          message = `${alert.data?.ccpName || alert.data?.ccpId} 温度${dir}趋势预警，预测${alert.data?.predictMinutes}分钟后${alert.data?.predictedTemperature}°C`;
         } else {
           message = `${alert.data?.ccpId} 温度偏差 (${alert.data?.level === 'critical' ? '严重' : '轻微'})`;
         }
