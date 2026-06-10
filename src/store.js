@@ -837,6 +837,14 @@ class DataStore {
     return updated;
   }
 
+  closeEnergyAnomaly(id, closeReason = 'auto_recovered') {
+    const event = this.energyAnomalyEvents.get(id);
+    if (!event) return null;
+    const updated = { ...event, status: 'closed', closedAt: new Date().toISOString(), closeReason };
+    this.energyAnomalyEvents.set(id, updated);
+    return updated;
+  }
+
   addLinkedWarningToAnomaly(anomalyId, warning) {
     const event = this.energyAnomalyEvents.get(anomalyId);
     if (!event) return null;
@@ -845,17 +853,21 @@ class DataStore {
     return event;
   }
 
-  setLineCorrelation(lineA, lineB, correlation) {
+  setLineCorrelation(lineA, lineB, correlation, dataValid = true) {
     const key = [lineA, lineB].sort().join('||');
+    const isSharedColdSource = dataValid && correlation >= this.energyConfig.correlationThreshold;
     this.lineCorrelations.set(key, {
       lineA: [lineA, lineB].sort()[0],
       lineB: [lineA, lineB].sort()[1],
       correlation,
-      isSharedColdSource: correlation >= this.energyConfig.correlationThreshold,
+      dataValid,
+      isSharedColdSource,
       calculatedAt: new Date().toISOString()
     });
-    if (correlation >= this.energyConfig.correlationThreshold) {
+    if (isSharedColdSource) {
       this.sharedColdSourcePairs.add(key);
+    } else {
+      this.sharedColdSourcePairs.delete(key);
     }
   }
 

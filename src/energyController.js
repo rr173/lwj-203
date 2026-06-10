@@ -151,9 +151,10 @@ function checkEnergyAnomaly(ccpId) {
 
   const deviationRatio = Math.abs(current.unitEnergyKwhPerDegHour - baseline.mean) / baseline.mean;
 
+  const existingOpen = store.getOpenEnergyAnomalyForCCP(ccpId);
+
   if (deviationRatio > config.anomalyThreshold) {
-    const existing = store.getOpenEnergyAnomalyForCCP(ccpId);
-    if (existing) return existing;
+    if (existingOpen) return existingOpen;
 
     const anomaly = store.addEnergyAnomalyEvent({
       ccpId,
@@ -171,9 +172,14 @@ function checkEnergyAnomaly(ccpId) {
     triggerLinkedWarnings(anomaly);
     broadcastEnergyAnomaly(anomaly);
     return anomaly;
+  } else {
+    if (existingOpen) {
+      const recovered = store.closeEnergyAnomaly(existingOpen.id, 'auto_recovered');
+      broadcastEnergyAnomaly({ ...recovered, event: 'recovered' });
+      return recovered;
+    }
+    return null;
   }
-
-  return null;
 }
 
 function triggerLinkedWarnings(anomaly) {
@@ -467,6 +473,38 @@ function pearsonCorrelation(x, y) {
   return numerator / denominator;
 }
 
+function validateEnergyCorrelationData(seriesA, seriesB) {
+  const MIN_SAMPLES = 10;
+  const MIN_NONZERO_SAMPLES = 5;
+  const MIN_COEFFICIENT_OF_VARIATION = 0.02;
+
+  if (seriesA.length < MIN_SAMPLES || seriesB.length < MIN_SAMPLES) {
+    return { valid: false, reason: `样本数不足(需要≥${MIN_SAMPLES}个)` };
+  }
+
+  const nonZeroA = seriesA.filter(v => v > 0).length;
+  const nonZeroB = seriesB.filter(v => v > 0).length;
+  if (nonZeroA < MIN_NONZERO_SAMPLES || nonZeroB < MIN_NONZERO_SAMPLES) {
+    return { valid: false, reason: `非零数据点不足(需要≥${MIN_NONZERO_SAMPLES}个)` };
+  }
+
+  function cv(arr) {
+    const n = arr.length;
+    const mean = arr.reduce((a, b) => a + b, 0) / n;
+    if (mean <= 0) return 0;
+    const variance = arr.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / n;
+    return Math.sqrt(variance) / mean;
+  }
+
+  const cvA = cv(seriesA);
+  const cvB = cv(seriesB);
+  if (cvA < MIN_COEFFICIENT_OF_VARIATION && cvB < MIN_COEFFICIENT_OF_VARIATION) {
+    return { valid: false, reason: '两组数据波动均过小，可能为静态/零值数据' };
+  }
+
+  return { valid: true, cvA: parseFloat(cvA.toFixed(4)), cvB: parseFloat(cvB.toFixed(4)), nonZeroA, nonZeroB };
+}
+
 function calculateLineCorrelation(req, res) {
   const { lineA, lineB, startTime, endTime } = req.query;
 
@@ -494,10 +532,11 @@ function calculateLineCorrelation(req, res) {
 
   const correlation = pearsonCorrelation(lineATotal, lineBTotal);
   const config = store.getEnergyConfig();
-  const isSharedColdSource = correlation !== null && correlation >= config.correlationThreshold;
+  const validation = validateEnergyCorrelationData(lineATotal, lineBTotal);
+  const isSharedColdSource = validation.valid && correlation !== null && correlation >= config.correlationThreshold;
 
   if (correlation !== null) {
-    store.setLineCorrelation(lineA, lineB, parseFloat(correlation.toFixed(4)));
+    store.setLineCorrelation(lineA, lineB, parseFloat(correlation.toFixed(4)), validation.valid);
   }
 
   res.json({
@@ -509,7 +548,10 @@ function calculateLineCorrelation(req, res) {
     correlation: correlation !== null ? parseFloat(correlation.toFixed(4)) : null,
     correlationThreshold: config.correlationThreshold,
     isSharedColdSource,
-    label: isSharedColdSource ? '疑似共用冷源' : '能耗相关性正常',
+    dataValid: validation.valid,
+    validationReason: validation.reason || null,
+    validationDetails: validation.valid ? { cvA: validation.cvA, cvB: validation.cvB, nonZeroA: validation.nonZeroA, nonZeroB: validation.nonZeroB } : null,
+    label: isSharedColdSource ? '疑似共用冷源' : (validation.valid ? '能耗相关性正常' : `数据有效性校验未通过：${validation.reason}`),
     lineAEnergySeries: lineATotal.map(v => parseFloat(v.toFixed(4))),
     lineBEnergySeries: lineBTotal.map(v => parseFloat(v.toFixed(4))),
     timestamps
@@ -675,9 +717,16 @@ function recalculateAllCorrelations() {
         }
 
         const correlation = pearsonCorrelation(lineATotal, lineBTotal);
+        const validation = validateEnergyCorrelationData(lineATotal, lineBTotal);
         if (correlation !== null) {
-          store.setLineCorrelation(lineA, lineB, parseFloat(correlation.toFixed(4)));
-          results.push({ lineA, lineB, correlation: parseFloat(correlation.toFixed(4)) });
+          store.setLineCorrelation(lineA, lineB, parseFloat(correlation.toFixed(4)), validation.valid);
+          results.push({
+            lineA,
+            lineB,
+            correlation: parseFloat(correlation.toFixed(4)),
+            dataValid: validation.valid,
+            isSharedColdSource: validation.valid && correlation >= store.getEnergyConfig().correlationThreshold
+          });
         }
       } catch (err) {
         console.error(`[Energy] 计算产线相关性时出错:`, err.message);
@@ -707,6 +756,7 @@ module.exports = {
   calculateBaseline,
   checkEnergyAnomaly,
   pearsonCorrelation,
+  validateEnergyCorrelationData,
   runEnergyAnomalyDetectionForAll,
   recalculateAllBaselines,
   recalculateAllCorrelations,
