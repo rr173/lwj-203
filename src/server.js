@@ -16,6 +16,7 @@ const maintenanceController = require('./maintenanceController');
 const predictionController = require('./predictionController');
 const energyController = require('./energyController');
 const groupController = require('./groupController');
+const workOrderController = require('./workOrderController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 const { initWebSocket } = require('./websocket');
@@ -148,6 +149,21 @@ app.get('/api/ccp-groups/:id/ccp-summary', groupController.getGroupCCPSummary);
 app.get('/api/group-alerts', groupController.getGroupAlertHistory);
 app.get('/api/group-alerts/:alertId', groupController.getGroupAlertDetail);
 
+app.get('/api/work-order-templates', workOrderController.getWorkOrderTemplates);
+app.get('/api/work-orders', workOrderController.getAllWorkOrders);
+app.get('/api/work-orders/urgent', workOrderController.getOpenWorkOrdersSortedByTime);
+app.get('/api/work-orders/statistics', workOrderController.getWorkOrderStatistics);
+app.get('/api/work-orders/assignee/:assignee', workOrderController.getWorkOrdersByAssignee);
+app.get('/api/work-orders/:id', workOrderController.getWorkOrder);
+app.post('/api/work-orders/:id/accept', workOrderController.acceptWorkOrder);
+app.post('/api/work-orders/:id/complete-step', workOrderController.completeStep);
+app.post('/api/work-orders/:id/review', workOrderController.reviewWorkOrder);
+app.post('/api/work-orders/:id/close', workOrderController.closeWorkOrder);
+app.post('/api/work-orders/:id/reassign', workOrderController.reassignWorkOrder);
+
+app.get('/api/timeout-alerts', workOrderController.getTimeoutAlerts);
+app.post('/api/timeout-alerts/:id/acknowledge', workOrderController.acknowledgeTimeoutAlert);
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: '服务器内部错误' });
@@ -188,6 +204,21 @@ server.listen(PORT, () => {
 ║  GET    /api/offline-alerts (历史离线告警记录)                ║
 ║  GET    /api/reports/online-rate (CCP在线率统计)              ║
 ║  GET    /api/dashboard/overview (监控面板总览)                ║
+║                                                              ║
+║  === 偏差处置工单流转模块 ===                                 ║
+║  GET    /api/work-order-templates (工单模板列表)              ║
+║  GET    /api/work-orders (工单列表/分页查询)                  ║
+║  GET    /api/work-orders/urgent (未关闭工单按剩余时间排序)    ║
+║  GET    /api/work-orders/statistics (处置时效统计)            ║
+║  GET    /api/work-orders/assignee/:assignee (个人工单列表)    ║
+║  GET    /api/work-orders/:id (工单详情)                       ║
+║  POST   /api/work-orders/:id/accept (接单)                    ║
+║  POST   /api/work-orders/:id/complete-step (完成处置步骤)     ║
+║  POST   /api/work-orders/:id/review (主管复核)                ║
+║  POST   /api/work-orders/:id/close (手动关闭工单)             ║
+║  POST   /api/work-orders/:id/reassign (转派工单)              ║
+║  GET    /api/timeout-alerts (超时告警列表)                    ║
+║  POST   /api/timeout-alerts/:id/acknowledge (确认超时告警)    ║
 ╚══════════════════════════════════════════════════════════════╝
   `);
 });

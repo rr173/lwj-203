@@ -2,6 +2,7 @@ const { checkAndEscalateDeviations } = require('./deviationController');
 const { checkAllCCPsHeartbeat, getMinReportingFrequency } = require('./heartbeatController');
 const { runEnergyAnomalyDetectionForAll, recalculateAllCorrelations } = require('./energyController');
 const { checkAndEscalateGroupAlerts } = require('./groupAlertEngine');
+const { checkWorkOrderOverdue } = require('./workOrderController');
 
 const DEVIATION_CHECK_INTERVAL = 10 * 1000;
 const HEARTBEAT_BASE_INTERVAL = 1000;
@@ -9,6 +10,7 @@ const MIN_HEARTBEAT_INTERVAL = 1000;
 const ENERGY_ANOMALY_CHECK_INTERVAL = 5 * 60 * 1000;
 const CORRELATION_RECALC_INTERVAL = 30 * 60 * 1000;
 const GROUP_ESCALATION_CHECK_INTERVAL = 10 * 1000;
+const WORKORDER_OVERDUE_CHECK_INTERVAL = 30 * 1000;
 
 function startScheduler() {
   console.log(`启动偏差升级定时检查服务，间隔: ${DEVIATION_CHECK_INTERVAL / 1000}秒`);
@@ -67,6 +69,19 @@ function startScheduler() {
       console.error('组级告警升级检查出错:', error);
     }
   }, GROUP_ESCALATION_CHECK_INTERVAL);
+
+  console.log(`启动工单超时检测服务，间隔: ${WORKORDER_OVERDUE_CHECK_INTERVAL / 1000}秒`);
+  setInterval(() => {
+    try {
+      const overdue = checkWorkOrderOverdue();
+      if (overdue.length > 0) {
+        console.log(`[${new Date().toISOString()}] 检测到 ${overdue.length} 个工单超时:`);
+        overdue.forEach(o => console.log(`  - 工单 ${o.workOrder.id} (指派人: ${o.workOrder.assignee}, CCP: ${o.workOrder.ccpName})`));
+      }
+    } catch (error) {
+      console.error('工单超时检测出错:', error);
+    }
+  }, WORKORDER_OVERDUE_CHECK_INTERVAL);
 
   startHeartbeatScheduler();
 }

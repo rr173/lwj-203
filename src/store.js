@@ -47,6 +47,60 @@ class DataStore {
     this.nextCCPGroupId = 1;
     this.groupAlerts = new Map();
     this.nextGroupAlertId = 1;
+    this.workOrders = new Map();
+    this.nextWorkOrderId = 1;
+    this.workOrderTimeoutAlerts = new Map();
+    this.nextTimeoutAlertId = 1;
+    this.workOrderTemplates = {
+      minor: {
+        name: '轻微偏差简易模板',
+        description: '适用于轻微偏差，1步确认即可',
+        timeLimitMinutes: 60,
+        defaultAssignee: '值班操作员',
+        requiresReview: false,
+        steps: [
+          { description: '确认偏差已自动恢复，记录确认人', completed: false }
+        ]
+      },
+      moderate: {
+        name: '一般偏差标准模板',
+        description: '适用于一般偏差，2步操作+复核',
+        timeLimitMinutes: 120,
+        defaultAssignee: '现场工程师',
+        requiresReview: true,
+        reviewer: '当班主管',
+        steps: [
+          { description: '到达现场确认偏差情况，记录初始数据', completed: false },
+          { description: '执行纠偏操作，使参数恢复至合规范围', completed: false }
+        ]
+      },
+      critical: {
+        name: '严重偏差完整模板',
+        description: '适用于严重偏差，3步操作+主管复核',
+        timeLimitMinutes: 90,
+        defaultAssignee: '高级工程师',
+        requiresReview: true,
+        reviewer: '生产经理',
+        steps: [
+          { description: '立即到达现场，评估偏差影响范围和风险等级', completed: false },
+          { description: '执行应急纠偏措施，必要时暂停相关生产环节', completed: false },
+          { description: '排查根本原因，制定预防措施并记录', completed: false }
+        ]
+      },
+      severe: {
+        name: '致命偏差紧急模板',
+        description: '适用于致命偏差，紧急响应+多级复核',
+        timeLimitMinutes: 30,
+        defaultAssignee: '技术总监',
+        requiresReview: true,
+        reviewer: '质量总监',
+        steps: [
+          { description: '10分钟内到达现场，启动应急预案，通知管理层', completed: false },
+          { description: '立即执行紧急纠偏，隔离受影响产品批次', completed: false },
+          { description: '组织跨部门评审，评估质量风险并决定处置方案', completed: false }
+        ]
+      }
+    };
   }
 
   generateId(type) {
@@ -89,6 +143,10 @@ class DataStore {
         return `GRP${String(this.nextCCPGroupId++).padStart(4, '0')}`;
       case 'groupAlert':
         return `GA${String(this.nextGroupAlertId++).padStart(6, '0')}`;
+      case 'workOrder':
+        return `WO${String(this.nextWorkOrderId++).padStart(6, '0')}`;
+      case 'timeoutAlert':
+        return `TOA${String(this.nextTimeoutAlertId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -1092,6 +1150,431 @@ class DataStore {
       activeAlertTriggeredAt: activeAlert ? activeAlert.triggeredAt : null,
       activeAlertEscalatedAt: activeAlert ? activeAlert.escalatedAt : null,
       ccpStatuses
+    };
+  }
+
+  getWorkOrderTemplate(level) {
+    const templateMap = {
+      minor: 'minor',
+      moderate: 'moderate',
+      critical: 'critical',
+      severe: 'severe'
+    };
+    const templateKey = templateMap[level] || 'moderate';
+    return JSON.parse(JSON.stringify(this.workOrderTemplates[templateKey]));
+  }
+
+  getAllWorkOrderTemplates() {
+    return JSON.parse(JSON.stringify(this.workOrderTemplates));
+  }
+
+  createWorkOrderFromDeviation(deviation) {
+    const ccp = this.getCCP(deviation.ccpId);
+    const template = this.getWorkOrderTemplate(deviation.level);
+    const now = new Date().toISOString();
+    const id = this.generateId('workOrder');
+
+    const steps = template.steps.map((step, idx) => ({
+      stepIndex: idx + 1,
+      description: step.description,
+      completed: false,
+      completedAt: null,
+      completedBy: null
+    }));
+
+    const workOrder = {
+      id,
+      deviationId: deviation.id,
+      deviationLevel: deviation.level,
+      ccpId: deviation.ccpId,
+      ccpName: ccp ? ccp.name : '',
+      productionLine: ccp ? ccp.productionLine : '',
+      templateName: template.name,
+      description: `温控偏差处置工单 - ${ccp ? ccp.name : deviation.ccpId}`,
+      status: 'pending_accept',
+      assignee: deviation.assignee || template.defaultAssignee,
+      reviewer: template.requiresReview ? template.reviewer : null,
+      requiresReview: template.requiresReview,
+      timeLimitMinutes: template.timeLimitMinutes,
+      deadline: new Date(new Date(now).getTime() + template.timeLimitMinutes * 60 * 1000).toISOString(),
+      acceptedAt: null,
+      processingStartedAt: null,
+      reviewStartedAt: null,
+      closedAt: null,
+      isOverdue: false,
+      overdueAlertCreated: false,
+      steps,
+      createdAt: now,
+      updatedAt: now,
+      operationHistory: [
+        {
+          action: 'created',
+          operator: 'system',
+          timestamp: now,
+          remark: `由偏差事件 ${deviation.id} 自动生成`
+        }
+      ]
+    };
+
+    this.workOrders.set(id, workOrder);
+    return workOrder;
+  }
+
+  getWorkOrder(id) {
+    return this.workOrders.get(id) || null;
+  }
+
+  getAllWorkOrders() {
+    return Array.from(this.workOrders.values());
+  }
+
+  getOpenWorkOrders() {
+    return Array.from(this.workOrders.values()).filter(
+      wo => wo.status !== 'closed'
+    );
+  }
+
+  getWorkOrdersByDeviation(deviationId) {
+    return Array.from(this.workOrders.values()).filter(
+      wo => wo.deviationId === deviationId
+    );
+  }
+
+  getWorkOrdersByCCP(ccpId) {
+    return Array.from(this.workOrders.values()).filter(
+      wo => wo.ccpId === ccpId
+    );
+  }
+
+  getWorkOrdersByAssignee(assignee) {
+    return Array.from(this.workOrders.values()).filter(
+      wo => wo.assignee === assignee
+    );
+  }
+
+  getWorkOrdersByStatus(status) {
+    return Array.from(this.workOrders.values()).filter(
+      wo => wo.status === status
+    );
+  }
+
+  updateWorkOrder(id, updates) {
+    const workOrder = this.workOrders.get(id);
+    if (!workOrder) return null;
+    const updated = { ...workOrder, ...updates, updatedAt: new Date().toISOString() };
+    this.workOrders.set(id, updated);
+    return updated;
+  }
+
+  acceptWorkOrder(id, operator) {
+    const workOrder = this.workOrders.get(id);
+    if (!workOrder || workOrder.status !== 'pending_accept') return null;
+    const now = new Date().toISOString();
+    const deadline = new Date(new Date(now).getTime() + workOrder.timeLimitMinutes * 60 * 1000).toISOString();
+    const updated = {
+      ...workOrder,
+      status: 'processing',
+      acceptedAt: now,
+      processingStartedAt: now,
+      deadline,
+      updatedAt: now,
+      operationHistory: [
+        ...workOrder.operationHistory,
+        { action: 'accepted', operator, timestamp: now, remark: '工单已接单，开始处置计时' }
+      ]
+    };
+    this.workOrders.set(id, updated);
+    return updated;
+  }
+
+  completeWorkOrderStep(id, stepIndex, operator, remark) {
+    const workOrder = this.workOrders.get(id);
+    if (!workOrder || workOrder.status !== 'processing') return null;
+    const now = new Date().toISOString();
+    const steps = workOrder.steps.map(step => {
+      if (step.stepIndex === stepIndex && !step.completed) {
+        return { ...step, completed: true, completedAt: now, completedBy: operator };
+      }
+      return step;
+    });
+    const allStepsCompleted = steps.every(s => s.completed);
+    let newStatus = workOrder.status;
+    let reviewStartedAt = workOrder.reviewStartedAt;
+    const history = [
+      ...workOrder.operationHistory,
+      { action: 'step_completed', operator, timestamp: now, remark: `步骤${stepIndex}完成${remark ? ': ' + remark : ''}` }
+    ];
+    if (allStepsCompleted) {
+      if (workOrder.requiresReview) {
+        newStatus = 'pending_review';
+        reviewStartedAt = now;
+        history.push({ action: 'submitted_for_review', operator, timestamp: now, remark: '所有步骤完成，提交复核' });
+      } else {
+        newStatus = 'closed';
+        history.push({ action: 'auto_closed', operator: 'system', timestamp: now, remark: '无需复核，工单自动关闭' });
+      }
+    }
+    const updated = {
+      ...workOrder,
+      steps,
+      status: newStatus,
+      reviewStartedAt,
+      closedAt: newStatus === 'closed' ? now : workOrder.closedAt,
+      updatedAt: now,
+      operationHistory: history
+    };
+    this.workOrders.set(id, updated);
+    return updated;
+  }
+
+  reviewWorkOrder(id, reviewer, passed, reviewRemark) {
+    const workOrder = this.workOrders.get(id);
+    if (!workOrder || workOrder.status !== 'pending_review') return null;
+    const now = new Date().toISOString();
+    const history = [
+      ...workOrder.operationHistory
+    ];
+    let newStatus = workOrder.status;
+    let steps = workOrder.steps;
+    if (passed) {
+      newStatus = 'closed';
+      history.push({
+        action: 'review_passed',
+        operator: reviewer,
+        timestamp: now,
+        remark: `复核通过${reviewRemark ? ': ' + reviewRemark : ''}`
+      });
+    } else {
+      newStatus = 'processing';
+      steps = steps.map(s => ({ ...s, completed: false, completedAt: null, completedBy: null }));
+      history.push({
+        action: 'review_rejected',
+        operator: reviewer,
+        timestamp: now,
+        remark: `复核驳回，需重新处置${reviewRemark ? ': ' + reviewRemark : ''}`
+      });
+    }
+    const updated = {
+      ...workOrder,
+      status: newStatus,
+      steps,
+      closedAt: newStatus === 'closed' ? now : null,
+      updatedAt: now,
+      operationHistory: history
+    };
+    this.workOrders.set(id, updated);
+    return updated;
+  }
+
+  closeWorkOrder(id, closedBy, closeReason) {
+    const workOrder = this.workOrders.get(id);
+    if (!workOrder || workOrder.status === 'closed') return null;
+    const now = new Date().toISOString();
+    const updated = {
+      ...workOrder,
+      status: 'closed',
+      closedAt: now,
+      updatedAt: now,
+      operationHistory: [
+        ...workOrder.operationHistory,
+        { action: 'closed', operator: closedBy, timestamp: now, remark: closeReason || '工单手动关闭' }
+      ]
+    };
+    this.workOrders.set(id, updated);
+    return updated;
+  }
+
+  reassignWorkOrder(id, newAssignee, operator, reason) {
+    const workOrder = this.workOrders.get(id);
+    if (!workOrder) return null;
+    const now = new Date().toISOString();
+    const updated = {
+      ...workOrder,
+      assignee: newAssignee,
+      updatedAt: now,
+      operationHistory: [
+        ...workOrder.operationHistory,
+        { action: 'reassigned', operator, timestamp: now, remark: `转派给 ${newAssignee}${reason ? ': ' + reason : ''}` }
+      ]
+    };
+    this.workOrders.set(id, updated);
+    return updated;
+  }
+
+  markWorkOrderOverdue(id) {
+    const workOrder = this.workOrders.get(id);
+    if (!workOrder || workOrder.status === 'closed' || workOrder.isOverdue) return null;
+    const now = new Date().toISOString();
+    const updated = {
+      ...workOrder,
+      isOverdue: true,
+      overdueAlertCreated: true,
+      updatedAt: now,
+      operationHistory: [
+        ...workOrder.operationHistory,
+        { action: 'overdue', operator: 'system', timestamp: now, remark: '工单超过处置时限，标记为超时' }
+      ]
+    };
+    this.workOrders.set(id, updated);
+    const alert = this.createTimeoutAlert(updated);
+    return { workOrder: updated, alert };
+  }
+
+  createTimeoutAlert(workOrder) {
+    const id = this.generateId('timeoutAlert');
+    const now = new Date().toISOString();
+    const alert = {
+      id,
+      workOrderId: workOrder.id,
+      deviationId: workOrder.deviationId,
+      ccpId: workOrder.ccpId,
+      ccpName: workOrder.ccpName,
+      productionLine: workOrder.productionLine,
+      assignee: workOrder.assignee,
+      deviationLevel: workOrder.deviationLevel,
+      deadline: workOrder.deadline,
+      alertedAt: now,
+      status: 'active',
+      acknowledgedAt: null,
+      acknowledgedBy: null
+    };
+    this.workOrderTimeoutAlerts.set(id, alert);
+    return alert;
+  }
+
+  getTimeoutAlert(id) {
+    return this.workOrderTimeoutAlerts.get(id) || null;
+  }
+
+  getAllTimeoutAlerts(status) {
+    const alerts = Array.from(this.workOrderTimeoutAlerts.values());
+    if (status) return alerts.filter(a => a.status === status);
+    return alerts;
+  }
+
+  getTimeoutAlertsByWorkOrder(workOrderId) {
+    return Array.from(this.workOrderTimeoutAlerts.values()).filter(
+      a => a.workOrderId === workOrderId
+    );
+  }
+
+  acknowledgeTimeoutAlert(id, operator) {
+    const alert = this.workOrderTimeoutAlerts.get(id);
+    if (!alert) return null;
+    const now = new Date().toISOString();
+    const updated = {
+      ...alert,
+      status: 'acknowledged',
+      acknowledgedAt: now,
+      acknowledgedBy: operator
+    };
+    this.workOrderTimeoutAlerts.set(id, updated);
+    return updated;
+  }
+
+  getWorkOrdersWithRemainingTime() {
+    const now = Date.now();
+    return this.getOpenWorkOrders().map(wo => {
+      const deadline = new Date(wo.deadline).getTime();
+      let remainingMinutes = null;
+      if (wo.status === 'processing' || wo.status === 'pending_review') {
+        remainingMinutes = Math.max(0, Math.ceil((deadline - now) / 60000));
+      }
+      return { ...wo, remainingMinutes };
+    }).sort((a, b) => {
+      if (a.remainingMinutes === null && b.remainingMinutes === null) return 0;
+      if (a.remainingMinutes === null) return 1;
+      if (b.remainingMinutes === null) return -1;
+      return a.remainingMinutes - b.remainingMinutes;
+    });
+  }
+
+  getWorkOrderStatistics() {
+    const allOrders = this.getAllWorkOrders();
+    const closedOrders = allOrders.filter(wo => wo.status === 'closed');
+    const total = allOrders.length;
+    const closed = closedOrders.length;
+    const overdue = allOrders.filter(wo => wo.isOverdue).length;
+    const overdueRate = closed > 0 ? overdue / closed : 0;
+
+    let totalProcessingMinutes = 0;
+    let onTimeClosed = 0;
+    closedOrders.forEach(wo => {
+      if (wo.processingStartedAt && wo.closedAt) {
+        const start = new Date(wo.processingStartedAt).getTime();
+        const end = new Date(wo.closedAt).getTime();
+        const duration = (end - start) / 60000;
+        totalProcessingMinutes += duration;
+        if (!wo.isOverdue) onTimeClosed++;
+      }
+    });
+
+    const avgDurationMinutes = closed > 0 ? totalProcessingMinutes / closed : 0;
+
+    const monthlyTrend = {};
+    allOrders.forEach(wo => {
+      const date = new Date(wo.createdAt);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthlyTrend[monthKey]) {
+        monthlyTrend[monthKey] = {
+          month: monthKey,
+          total: 0,
+          closed: 0,
+          overdue: 0,
+          avgDurationMinutes: 0
+        };
+      }
+      monthlyTrend[monthKey].total++;
+      if (wo.status === 'closed') {
+        monthlyTrend[monthKey].closed++;
+        if (wo.processingStartedAt && wo.closedAt) {
+          const dur = (new Date(wo.closedAt).getTime() - new Date(wo.processingStartedAt).getTime()) / 60000;
+          monthlyTrend[monthKey].avgDurationMinutes += dur;
+        }
+      }
+      if (wo.isOverdue) {
+        monthlyTrend[monthKey].overdue++;
+      }
+    });
+
+    const trendArray = Object.values(monthlyTrend).sort((a, b) => a.month.localeCompare(b.month));
+    trendArray.forEach(t => {
+      if (t.closed > 0) {
+        t.avgDurationMinutes = parseFloat((t.avgDurationMinutes / t.closed).toFixed(2));
+        t.overdueRate = parseFloat((t.overdue / t.total).toFixed(4));
+      } else {
+        t.overdueRate = t.total > 0 ? parseFloat((t.overdue / t.total).toFixed(4)) : 0;
+      }
+    });
+
+    const byStatus = {
+      pending_accept: allOrders.filter(wo => wo.status === 'pending_accept').length,
+      processing: allOrders.filter(wo => wo.status === 'processing').length,
+      pending_review: allOrders.filter(wo => wo.status === 'pending_review').length,
+      closed: allOrders.filter(wo => wo.status === 'closed').length
+    };
+
+    const byLevel = {
+      minor: allOrders.filter(wo => wo.deviationLevel === 'minor').length,
+      moderate: allOrders.filter(wo => wo.deviationLevel === 'moderate').length,
+      critical: allOrders.filter(wo => wo.deviationLevel === 'critical').length,
+      severe: allOrders.filter(wo => wo.deviationLevel === 'severe').length
+    };
+
+    return {
+      summary: {
+        total,
+        closed,
+        open: total - closed,
+        overdue,
+        overdueRate: parseFloat(overdueRate.toFixed(4)),
+        avgDurationMinutes: parseFloat(avgDurationMinutes.toFixed(2)),
+        onTimeClosed,
+        onTimeRate: closed > 0 ? parseFloat((onTimeClosed / closed).toFixed(4)) : 0
+      },
+      byStatus,
+      byLevel,
+      monthlyTrend: trendArray
     };
   }
 }

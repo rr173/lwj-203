@@ -1,6 +1,6 @@
 const store = require('./store');
 const { handleCCPRecovered } = require('./heartbeatController');
-const { broadcastDeviation } = require('./websocket');
+const { broadcastDeviation, broadcastWorkOrder } = require('./websocket');
 const { evaluateRulesForCCP } = require('./ruleEngine');
 const { onReadingSaved } = require('./replayEngine');
 const { runPrediction } = require('./predictionEngine');
@@ -8,19 +8,42 @@ const { checkEnergyAnomaly } = require('./energyController');
 const { evaluateGroupForCCP } = require('./groupAlertEngine');
 
 function determineReadingLevel(temperature, ccp) {
+  const complianceRange = ccp.complianceMax - ccp.complianceMin;
+  const criticalRange = ccp.criticalMax - ccp.criticalMin;
+  const severeThreshold = complianceRange * 0.5;
+
   if (temperature < ccp.criticalMin || temperature > ccp.criticalMax) {
-    return 'critical';
+    return 'severe';
   }
-  if (temperature < ccp.complianceMin || temperature > ccp.complianceMax) {
+
+  if (temperature < ccp.complianceMin) {
+    const deviation = ccp.complianceMin - temperature;
+    if (deviation >= severeThreshold) {
+      return 'critical';
+    }
+    return 'moderate';
+  }
+  if (temperature > ccp.complianceMax) {
+    const deviation = temperature - ccp.complianceMax;
+    if (deviation >= severeThreshold) {
+      return 'critical';
+    }
+    return 'moderate';
+  }
+
+  if (temperature < ccp.complianceMin + complianceRange * 0.1 ||
+      temperature > ccp.complianceMax - complianceRange * 0.1) {
     return 'minor';
   }
+
   return 'normal';
 }
 
 function handleStatusTransition(ccp, newStatus, reading) {
   const oldStatus = ccp.status;
-  
-  if (oldStatus === 'normal' && (newStatus === 'minor' || newStatus === 'critical')) {
+  const abnormalStatuses = ['minor', 'moderate', 'critical', 'severe'];
+
+  if (oldStatus === 'normal' && abnormalStatuses.includes(newStatus)) {
     const readingTimeMs = new Date(reading.timestamp).getTime();
     const isMaintenance = store.isLineUnderMaintenance(ccp.productionLine, readingTimeMs);
     const deviation = store.addDeviation({
@@ -34,6 +57,15 @@ function handleStatusTransition(ccp, newStatus, reading) {
     ccp.status = newStatus;
     store.updateCCP(ccp.id, { status: newStatus });
     broadcastDeviation(deviation);
+
+    try {
+      const workOrder = store.createWorkOrderFromDeviation(deviation);
+      console.log(`[WorkOrder] 偏差 ${deviation.id} 自动生成工单: ${workOrder.id}, 等级: ${deviation.level}, 指派人: ${workOrder.assignee}`);
+      broadcastWorkOrder(workOrder);
+    } catch (err) {
+      console.error(`[WorkOrder] 为偏差 ${deviation.id} 创建工单失败:`, err.message);
+    }
+
     try {
       evaluateGroupForCCP(ccp.id);
     } catch (err) {
@@ -42,7 +74,7 @@ function handleStatusTransition(ccp, newStatus, reading) {
     return deviation;
   }
 
-  if ((oldStatus === 'minor' || oldStatus === 'critical') && newStatus === 'normal') {
+  if (abnormalStatuses.includes(oldStatus) && newStatus === 'normal') {
     const openDeviation = store.getOpenDeviationForCCP(ccp.id);
     if (openDeviation) {
       store.updateDeviation(openDeviation.id, {
@@ -61,18 +93,24 @@ function handleStatusTransition(ccp, newStatus, reading) {
     }
   }
 
-  if (oldStatus === 'minor' && newStatus === 'critical') {
-    const openDeviation = store.getOpenDeviationForCCP(ccp.id);
-    if (openDeviation) {
-      store.updateDeviation(openDeviation.id, { level: 'critical' });
+  const statusSeverity = { minor: 1, moderate: 2, critical: 3, severe: 4 };
+  if (abnormalStatuses.includes(oldStatus) && abnormalStatuses.includes(newStatus)) {
+    const oldSeverity = statusSeverity[oldStatus] || 0;
+    const newSeverity = statusSeverity[newStatus] || 0;
+    if (newSeverity > oldSeverity) {
+      const openDeviation = store.getOpenDeviationForCCP(ccp.id);
+      if (openDeviation) {
+        store.updateDeviation(openDeviation.id, { level: newStatus });
+        const workOrders = store.getWorkOrdersByDeviation(openDeviation.id);
+        for (const wo of workOrders) {
+          if (wo.status !== 'closed') {
+            store.updateWorkOrder(wo.id, { deviationLevel: newStatus });
+          }
+        }
+      }
+      ccp.status = newStatus;
+      store.updateCCP(ccp.id, { status: newStatus });
     }
-    ccp.status = 'critical';
-    store.updateCCP(ccp.id, { status: 'critical' });
-  }
-
-  if (oldStatus === 'critical' && newStatus === 'minor') {
-    ccp.status = 'minor';
-    store.updateCCP(ccp.id, { status: 'minor' });
   }
 
   return null;

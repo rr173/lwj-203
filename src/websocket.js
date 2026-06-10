@@ -165,6 +165,64 @@ function broadcastGroupEscalation(alert) {
   });
 }
 
+function broadcastWorkOrder(workOrder) {
+  broadcast({
+    type: 'work_order',
+    id: `wo_${workOrder.id}_${Date.now()}`,
+    data: {
+      id: workOrder.id,
+      deviationId: workOrder.deviationId,
+      deviationLevel: workOrder.deviationLevel,
+      ccpId: workOrder.ccpId,
+      ccpName: workOrder.ccpName,
+      productionLine: workOrder.productionLine,
+      status: workOrder.status,
+      assignee: workOrder.assignee,
+      deadline: workOrder.deadline,
+      isOverdue: workOrder.isOverdue,
+      stepsCompleted: workOrder.steps.filter(s => s.completed).length,
+      stepsTotal: workOrder.steps.length,
+      createdAt: workOrder.createdAt,
+    },
+  });
+}
+
+function broadcastWorkOrderStatusChange(workOrder, changeType, operator) {
+  broadcast({
+    type: 'work_order_status',
+    id: `wos_${workOrder.id}_${Date.now()}`,
+    data: {
+      id: workOrder.id,
+      deviationId: workOrder.deviationId,
+      status: workOrder.status,
+      changeType,
+      operator,
+      assignee: workOrder.assignee,
+      isOverdue: workOrder.isOverdue,
+      timestamp: new Date().toISOString(),
+    },
+  });
+}
+
+function broadcastTimeoutAlert(alert) {
+  broadcast({
+    type: 'timeout_alert',
+    id: `toa_${alert.id}_${Date.now()}`,
+    data: {
+      id: alert.id,
+      workOrderId: alert.workOrderId,
+      deviationId: alert.deviationId,
+      ccpId: alert.ccpId,
+      ccpName: alert.ccpName,
+      productionLine: alert.productionLine,
+      assignee: alert.assignee,
+      deviationLevel: alert.deviationLevel,
+      deadline: alert.deadline,
+      alertedAt: alert.alertedAt,
+    },
+  });
+}
+
 module.exports = {
   initWebSocket,
   broadcast,
@@ -177,4 +235,7 @@ module.exports = {
   broadcastMaintenanceStatus,
   broadcastGroupAlert,
   broadcastGroupEscalation,
+  broadcastWorkOrder,
+  broadcastWorkOrderStatusChange,
+  broadcastTimeoutAlert,
 };
