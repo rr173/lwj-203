@@ -1,9 +1,12 @@
 const { checkAndEscalateDeviations } = require('./deviationController');
 const { checkAllCCPsHeartbeat, getMinReportingFrequency } = require('./heartbeatController');
+const { runEnergyAnomalyDetectionForAll, recalculateAllCorrelations } = require('./energyController');
 
 const DEVIATION_CHECK_INTERVAL = 10 * 1000;
 const HEARTBEAT_BASE_INTERVAL = 1000;
 const MIN_HEARTBEAT_INTERVAL = 1000;
+const ENERGY_ANOMALY_CHECK_INTERVAL = 5 * 60 * 1000;
+const CORRELATION_RECALC_INTERVAL = 30 * 60 * 1000;
 
 function startScheduler() {
   console.log(`启动偏差升级定时检查服务，间隔: ${DEVIATION_CHECK_INTERVAL / 1000}秒`);
@@ -19,6 +22,36 @@ function startScheduler() {
       console.error('偏差升级检查出错:', error);
     }
   }, DEVIATION_CHECK_INTERVAL);
+
+  console.log(`启动能效异常检测服务，间隔: ${ENERGY_ANOMALY_CHECK_INTERVAL / 1000}秒`);
+  setInterval(() => {
+    try {
+      const anomalies = runEnergyAnomalyDetectionForAll();
+      if (anomalies.length > 0) {
+        console.log(`[${new Date().toISOString()}] 检测到 ${anomalies.length} 个能效异常事件:`);
+        anomalies.forEach(a => console.log(`  - ${a.id} (CCP: ${a.ccpId}, 偏离率: ${(a.deviationRatio * 100).toFixed(1)}%)`));
+      }
+    } catch (error) {
+      console.error('能效异常检测出错:', error);
+    }
+  }, ENERGY_ANOMALY_CHECK_INTERVAL);
+
+  console.log(`启动产线能耗相关性重算服务，间隔: ${CORRELATION_RECALC_INTERVAL / 1000}秒`);
+  setInterval(() => {
+    try {
+      const correlations = recalculateAllCorrelations();
+      if (correlations.length > 0) {
+        console.log(`[${new Date().toISOString()}] 重算了 ${correlations.length} 对产线能耗相关性`);
+        correlations.forEach(c => {
+          if (c.correlation >= 0.8) {
+            console.log(`  - ${c.lineA} <-> ${c.lineB}: ${c.correlation} (疑似共用冷源)`);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('产线相关性重算出错:', error);
+    }
+  }, CORRELATION_RECALC_INTERVAL);
 
   startHeartbeatScheduler();
 }

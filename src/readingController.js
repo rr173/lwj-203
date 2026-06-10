@@ -4,6 +4,7 @@ const { broadcastDeviation } = require('./websocket');
 const { evaluateRulesForCCP } = require('./ruleEngine');
 const { onReadingSaved } = require('./replayEngine');
 const { runPrediction } = require('./predictionEngine');
+const { checkEnergyAnomaly } = require('./energyController');
 
 function determineReadingLevel(temperature, ccp) {
   if (temperature < ccp.criticalMin || temperature > ccp.criticalMax) {
@@ -125,6 +126,14 @@ function submitReadings(req, res) {
         temperature: reading.temperature,
         level
       });
+
+      if (reading.powerKw !== undefined && reading.powerKw !== null) {
+        store.addPowerReading(ccpId, {
+          timestamp: reading.timestamp,
+          powerKw: parseFloat(Number(reading.powerKw).toFixed(4)),
+          equipmentType: reading.equipmentType || 'unknown'
+        });
+      }
       
       handleStatusTransition(ccp, level, savedReading);
 
@@ -151,7 +160,8 @@ function submitReadings(req, res) {
         readingId: savedReading.id,
         timestamp: reading.timestamp,
         temperature: reading.temperature,
-        level
+        level,
+        powerKw: reading.powerKw !== undefined ? parseFloat(Number(reading.powerKw).toFixed(4)) : undefined
       });
     }
 
@@ -160,6 +170,15 @@ function submitReadings(req, res) {
       const lastValid = ccpReadings[ccpReadings.length - 1];
       store.updateCCP(ccpId, { lastReadingTime: lastValid.timestamp });
       handleCCPRecovered(ccpId, firstValid.timestamp);
+
+      try {
+        const hasPower = ccpReadings.some(r => r.powerKw !== undefined && r.powerKw !== null);
+        if (hasPower) {
+          checkEnergyAnomaly(ccpId);
+        }
+      } catch (err) {
+        console.error(`[Energy] 检查CCP ${ccpId}能效异常时出错:`, err.message);
+      }
     }
   }
 

@@ -14,6 +14,7 @@ const batchController = require('./batchController');
 const calibrationController = require('./calibrationController');
 const maintenanceController = require('./maintenanceController');
 const predictionController = require('./predictionController');
+const energyController = require('./energyController');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 const { initWebSocket } = require('./websocket');
@@ -117,6 +118,24 @@ app.get('/api/prediction/alerts', predictionController.getAlertingCCPs);
 app.get('/api/prediction/config', predictionController.getPredictionConfig);
 app.put('/api/prediction/config', predictionController.setPredictionConfig);
 app.get('/api/prediction/model-distribution', predictionController.getModelDistributionStats);
+
+app.post('/api/power-readings', energyController.submitPowerReadings);
+app.get('/api/ccps/:ccpId/power-readings', energyController.getPowerReadings);
+app.get('/api/ccps/:ccpId/energy-detail', energyController.getCCPEnergyDetail);
+
+app.get('/api/energy/overview', energyController.getEnergyOverview);
+app.get('/api/energy/ranking', energyController.getEnergyRanking);
+app.get('/api/energy/trend-comparison', energyController.getEnergyTrendComparison);
+
+app.get('/api/energy/correlation', energyController.calculateLineCorrelation);
+app.get('/api/energy/correlations', energyController.getAllCorrelations);
+
+app.get('/api/energy-anomalies', energyController.getAllEnergyAnomalies);
+app.get('/api/energy-anomalies/:id', energyController.getEnergyAnomaly);
+app.post('/api/energy-anomalies/:id/acknowledge', energyController.acknowledgeEnergyAnomaly);
+
+app.get('/api/energy/config', energyController.getEnergyConfig);
+app.put('/api/energy/config', energyController.updateEnergyConfig);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

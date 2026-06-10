@@ -31,6 +31,18 @@ class DataStore {
     this.nextCalibrationAlertId = 1;
     this.maintenancePlans = new Map();
     this.nextMaintenancePlanId = 1;
+    this.powerReadings = new Map();
+    this.nextPowerReadingId = 1;
+    this.energyBaselines = new Map();
+    this.energyAnomalyEvents = new Map();
+    this.nextEnergyAnomalyId = 1;
+    this.lineCorrelations = new Map();
+    this.sharedColdSourcePairs = new Set();
+    this.energyConfig = {
+      anomalyThreshold: 0.3,
+      baselineWindowHours: 24,
+      correlationThreshold: 0.8
+    };
   }
 
   generateId(type) {
@@ -65,6 +77,10 @@ class DataStore {
         return `CALALT${String(this.nextCalibrationAlertId++).padStart(6, '0')}`;
       case 'maintenancePlan':
         return `MNT${String(this.nextMaintenancePlanId++).padStart(6, '0')}`;
+      case 'powerReading':
+        return this.nextPowerReadingId++;
+      case 'energyAnomaly':
+        return `ENA${String(this.nextEnergyAnomalyId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -724,6 +740,158 @@ class DataStore {
     return this.getMaintenancePlansByLine(productionLine)
       .filter(p => new Date(p.endTime).getTime() <= now)
       .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime());
+  }
+
+  addPowerReading(ccpId, reading) {
+    const id = this.generateId('powerReading');
+    const readingWithId = { ...reading, id, ccpId };
+    if (!this.powerReadings.has(ccpId)) {
+      this.powerReadings.set(ccpId, []);
+    }
+    this.powerReadings.get(ccpId).push(readingWithId);
+    return readingWithId;
+  }
+
+  getPowerReadings(ccpId, startTime, endTime) {
+    const readings = this.powerReadings.get(ccpId) || [];
+    if (!startTime && !endTime) return readings;
+    return readings.filter(r => {
+      const time = new Date(r.timestamp).getTime();
+      if (startTime && time < startTime) return false;
+      if (endTime && time > endTime) return false;
+      return true;
+    });
+  }
+
+  getLastPowerReading(ccpId) {
+    const readings = this.powerReadings.get(ccpId) || [];
+    return readings.length > 0 ? readings[readings.length - 1] : null;
+  }
+
+  getAllPowerReadingsByLine(productionLine, startTime, endTime) {
+    const ccpIds = this.getCCPsByProductionLine(productionLine).map(c => c.id);
+    const result = [];
+    for (const ccpId of ccpIds) {
+      result.push(...this.getPowerReadings(ccpId, startTime, endTime));
+    }
+    return result;
+  }
+
+  setEnergyBaseline(ccpId, baseline) {
+    this.energyBaselines.set(ccpId, {
+      ...baseline,
+      ccpId,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  getEnergyBaseline(ccpId) {
+    return this.energyBaselines.get(ccpId) || null;
+  }
+
+  getAllEnergyBaselines() {
+    return Array.from(this.energyBaselines.values());
+  }
+
+  addEnergyAnomalyEvent(event) {
+    const id = this.generateId('energyAnomaly');
+    const now = new Date().toISOString();
+    const eventWithId = {
+      ...event,
+      id,
+      status: 'open',
+      createdAt: now,
+      acknowledgedAt: null,
+      linkedWarnings: []
+    };
+    this.energyAnomalyEvents.set(id, eventWithId);
+    return eventWithId;
+  }
+
+  getEnergyAnomalyEvent(id) {
+    return this.energyAnomalyEvents.get(id) || null;
+  }
+
+  getAllEnergyAnomalyEvents() {
+    return Array.from(this.energyAnomalyEvents.values());
+  }
+
+  getOpenEnergyAnomalies() {
+    return Array.from(this.energyAnomalyEvents.values()).filter(e => e.status === 'open');
+  }
+
+  getEnergyAnomaliesByCCP(ccpId) {
+    return Array.from(this.energyAnomalyEvents.values()).filter(e => e.ccpId === ccpId);
+  }
+
+  getOpenEnergyAnomalyForCCP(ccpId) {
+    return Array.from(this.energyAnomalyEvents.values())
+      .find(e => e.ccpId === ccpId && e.status === 'open');
+  }
+
+  acknowledgeEnergyAnomaly(id) {
+    const event = this.energyAnomalyEvents.get(id);
+    if (!event) return null;
+    const updated = { ...event, status: 'acknowledged', acknowledgedAt: new Date().toISOString() };
+    this.energyAnomalyEvents.set(id, updated);
+    return updated;
+  }
+
+  addLinkedWarningToAnomaly(anomalyId, warning) {
+    const event = this.energyAnomalyEvents.get(anomalyId);
+    if (!event) return null;
+    event.linkedWarnings.push({ ...warning, createdAt: new Date().toISOString() });
+    this.energyAnomalyEvents.set(anomalyId, event);
+    return event;
+  }
+
+  setLineCorrelation(lineA, lineB, correlation) {
+    const key = [lineA, lineB].sort().join('||');
+    this.lineCorrelations.set(key, {
+      lineA: [lineA, lineB].sort()[0],
+      lineB: [lineA, lineB].sort()[1],
+      correlation,
+      isSharedColdSource: correlation >= this.energyConfig.correlationThreshold,
+      calculatedAt: new Date().toISOString()
+    });
+    if (correlation >= this.energyConfig.correlationThreshold) {
+      this.sharedColdSourcePairs.add(key);
+    }
+  }
+
+  getLineCorrelation(lineA, lineB) {
+    const key = [lineA, lineB].sort().join('||');
+    return this.lineCorrelations.get(key) || null;
+  }
+
+  getAllLineCorrelations() {
+    return Array.from(this.lineCorrelations.values());
+  }
+
+  getSharedColdSourcePairs() {
+    return Array.from(this.sharedColdSourcePairs).map(key => {
+      const [lineA, lineB] = key.split('||');
+      return { lineA, lineB, correlation: this.lineCorrelations.get(key)?.correlation || 0 };
+    });
+  }
+
+  getLinkedLines(productionLine) {
+    const linked = [];
+    for (const key of this.sharedColdSourcePairs) {
+      const [lineA, lineB] = key.split('||');
+      if (lineA === productionLine) linked.push(lineB);
+      if (lineB === productionLine) linked.push(lineA);
+    }
+    return linked;
+  }
+
+  getEnergyConfig() {
+    return { ...this.energyConfig };
+  }
+
+  updateEnergyConfig(config) {
+    this.energyConfig = { ...this.energyConfig, ...config };
+    return this.getEnergyConfig();
   }
 }
 
