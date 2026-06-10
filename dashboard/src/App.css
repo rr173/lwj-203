@@ -3648,3 +3648,35 @@ body {
 .model-comparison-card.model-comparison-recommended .model-comparison-mae-value {
   color: var(--model-color, var(--color-primary));
 }
+
+.model-comparison-card.model-comparison-alert {
+  border-color: var(--color-red);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.model-comparison-card.model-comparison-alert.model-comparison-recommended {
+  box-shadow: 0 0 0 1px var(--model-color, var(--color-primary)), 0 0 12px rgba(59, 130, 246, 0.15);
+}
+
+.model-comparison-card-badges {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.model-comparison-alert-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--color-red);
+  color: #fff;
+  animation: pulse 1.5s infinite;
+}
+
+.trend-prediction-alert-models {
+  font-size: 13px;
+  color: var(--color-red);
+  font-weight: 600;
+  padding-top: 4px;
+}

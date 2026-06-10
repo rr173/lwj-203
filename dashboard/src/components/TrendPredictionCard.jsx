@@ -41,17 +41,23 @@ function ModelComparisonSection({ models, recommendedModel }) {
           const model = models[key];
           if (!model) return null;
           const isRecommended = model.isRecommended;
+          const hasAlert = model.alertTriggered;
           return (
             <div
               key={key}
-              className={`model-comparison-card ${isRecommended ? 'model-comparison-recommended' : ''}`}
+              className={`model-comparison-card ${isRecommended ? 'model-comparison-recommended' : ''} ${hasAlert ? 'model-comparison-alert' : ''}`}
               style={{ '--model-color': MODEL_COLORS[key] }}
             >
               <div className="model-comparison-card-header">
                 <span className="model-comparison-model-name">{model.name}</span>
-                {isRecommended && (
-                  <span className="model-comparison-recommended-badge">推荐</span>
-                )}
+                <div className="model-comparison-card-badges">
+                  {hasAlert && (
+                    <span className="model-comparison-alert-badge">预警</span>
+                  )}
+                  {isRecommended && (
+                    <span className="model-comparison-recommended-badge">推荐</span>
+                  )}
+                </div>
               </div>
               <div className="model-comparison-card-body">
                 <div className="model-comparison-pred">
@@ -163,7 +169,9 @@ export default function TrendPredictionCard({ ccpId }) {
             <div className="trend-prediction-r2">
               <span className="trend-prediction-label">R² 拟合度</span>
               <span className="trend-prediction-r2-value">
-                {prediction.r2.toFixed(4)}
+                {prediction.r2 !== null && prediction.r2 !== undefined
+                  ? prediction.r2.toFixed(4)
+                  : '—'}
               </span>
             </div>
           </div>
@@ -190,6 +198,11 @@ export default function TrendPredictionCard({ ccpId }) {
               <div className="trend-prediction-alert-slope">
                 当前斜率: {slopePerMin >= 0 ? '+' : ''}{slopePerMin.toFixed(4)}°C/min
               </div>
+              {prediction.alertModels && prediction.alertModels.length > 0 && (
+                <div className="trend-prediction-alert-models">
+                  触发预警模型: {prediction.alertModels.map(m => MODEL_LABELS[m] || m).join('、')}
+                </div>
+              )}
             </div>
           )}
 

@@ -83,12 +83,14 @@ function predictLinearRegression(points, predictOffsetSec) {
 
   const { slope, intercept, r2 } = regression;
   const lastTimeSec = points[points.length - 1].x;
+  const currentBaseline = slope * lastTimeSec + intercept;
   const predictedTemp = slope * (lastTimeSec + predictOffsetSec) + intercept;
 
   return {
     predictedTemperature: parseFloat(predictedTemp.toFixed(2)),
     slope: parseFloat(slope.toFixed(6)),
-    r2: parseFloat(r2.toFixed(6))
+    r2: parseFloat(r2.toFixed(6)),
+    currentBaseline: parseFloat(currentBaseline.toFixed(2))
   };
 }
 
@@ -230,6 +232,34 @@ function selectRecommendedModel(ccpId) {
   return candidates[0].model;
 }
 
+function computeModelAlert(predictedTemp, slope, baseline, ccp, lastReadingMs) {
+  const result = { alertTriggered: false, alertDirection: null, predictedArrivalTime: null };
+
+  if (predictedTemp === null || baseline === null) return result;
+
+  if (slope > 0 && predictedTemp > ccp.complianceMax) {
+    result.alertTriggered = true;
+    result.alertDirection = 'upper';
+    if (baseline < ccp.complianceMax && slope > 0) {
+      const secondsToBreach = (ccp.complianceMax - baseline) / slope;
+      result.predictedArrivalTime = new Date(lastReadingMs + secondsToBreach * 1000).toISOString();
+    } else {
+      result.predictedArrivalTime = new Date(lastReadingMs).toISOString();
+    }
+  } else if (slope < 0 && predictedTemp < ccp.complianceMin) {
+    result.alertTriggered = true;
+    result.alertDirection = 'lower';
+    if (baseline > ccp.complianceMin && slope < 0) {
+      const secondsToBreach = (ccp.complianceMin - baseline) / slope;
+      result.predictedArrivalTime = new Date(lastReadingMs + secondsToBreach * 1000).toISOString();
+    } else {
+      result.predictedArrivalTime = new Date(lastReadingMs).toISOString();
+    }
+  }
+
+  return result;
+}
+
 function predictForCCP(ccpId) {
   const ccp = store.getCCP(ccpId);
   if (!ccp) return null;
@@ -240,7 +270,7 @@ function predictForCCP(ccpId) {
       ccpId,
       ccpName: ccp.name,
       slope: 0,
-      r2: 0,
+      r2: null,
       predictedTemperature: null,
       alertTriggered: false,
       alertDirection: null,
@@ -248,7 +278,8 @@ function predictForCCP(ccpId) {
       sampleCount: 0,
       insufficientData: true,
       models: null,
-      recommendedModel: null
+      recommendedModel: null,
+      alertModels: []
     };
   }
 
@@ -272,7 +303,7 @@ function predictForCCP(ccpId) {
       ccpId,
       ccpName: ccp.name,
       slope: 0,
-      r2: 0,
+      r2: null,
       predictedTemperature: null,
       alertTriggered: false,
       alertDirection: null,
@@ -280,7 +311,8 @@ function predictForCCP(ccpId) {
       sampleCount: recent.length,
       insufficientData: true,
       models: null,
-      recommendedModel: null
+      recommendedModel: null,
+      alertModels: []
     };
   }
 
@@ -292,14 +324,58 @@ function predictForCCP(ccpId) {
   const maeEma = computeMAE(errorData ? errorData.ema : []);
   const maeMa = computeMAE(errorData ? errorData.ma : []);
 
+  const lastReadingMs = new Date(recent[recent.length - 1].timestamp).getTime();
+
+  const lrAlert = lrResult
+    ? computeModelAlert(lrResult.predictedTemperature, lrResult.slope, lrResult.currentBaseline, ccp, lastReadingMs)
+    : { alertTriggered: false, alertDirection: null, predictedArrivalTime: null };
+  const emaAlert = emaResult
+    ? computeModelAlert(emaResult.predictedTemperature, emaResult.emaSlope, emaResult.emaValue, ccp, lastReadingMs)
+    : { alertTriggered: false, alertDirection: null, predictedArrivalTime: null };
+  const maAlert = maResult
+    ? computeModelAlert(maResult.predictedTemperature, maResult.maSlope, maResult.maValue, ccp, lastReadingMs)
+    : { alertTriggered: false, alertDirection: null, predictedArrivalTime: null };
+
+  const modelAlerts = { linear: lrAlert, ema: emaAlert, ma: maAlert };
+
+  let alertTriggered = false;
+  let alertDirection = null;
+  let predictedArrivalTime = null;
+  const alertModels = [];
+
+  const allAlerts = [
+    { key: 'linear', alert: lrAlert },
+    { key: 'ema', alert: emaAlert },
+    { key: 'ma', alert: maAlert }
+  ];
+
+  for (const { key, alert } of allAlerts) {
+    if (alert.alertTriggered) {
+      alertTriggered = true;
+      alertModels.push(key);
+      if (!alertDirection) {
+        alertDirection = alert.alertDirection;
+      }
+      if (alert.predictedArrivalTime) {
+        if (!predictedArrivalTime || new Date(alert.predictedArrivalTime).getTime() < new Date(predictedArrivalTime).getTime()) {
+          predictedArrivalTime = alert.predictedArrivalTime;
+        }
+      }
+    }
+  }
+
   const models = {
     linear: {
       name: '线性回归',
       predictedTemperature: lrResult ? lrResult.predictedTemperature : null,
       slope: lrResult ? lrResult.slope : null,
       r2: lrResult ? lrResult.r2 : null,
+      currentBaseline: lrResult ? lrResult.currentBaseline : null,
       mae: maeLinear !== null ? parseFloat(maeLinear.toFixed(4)) : null,
-      isRecommended: recommendedModel === 'linear'
+      isRecommended: recommendedModel === 'linear',
+      alertTriggered: lrAlert.alertTriggered,
+      alertDirection: lrAlert.alertDirection,
+      predictedArrivalTime: lrAlert.predictedArrivalTime
     },
     ema: {
       name: '指数平滑',
@@ -307,7 +383,10 @@ function predictForCCP(ccpId) {
       emaValue: emaResult ? emaResult.emaValue : null,
       emaSlope: emaResult ? emaResult.emaSlope : null,
       mae: maeEma !== null ? parseFloat(maeEma.toFixed(4)) : null,
-      isRecommended: recommendedModel === 'ema'
+      isRecommended: recommendedModel === 'ema',
+      alertTriggered: emaAlert.alertTriggered,
+      alertDirection: emaAlert.alertDirection,
+      predictedArrivalTime: emaAlert.predictedArrivalTime
     },
     ma: {
       name: '移动平均',
@@ -316,7 +395,10 @@ function predictForCCP(ccpId) {
       maSlope: maResult ? maResult.maSlope : null,
       windowUsed: maResult ? maResult.windowUsed : null,
       mae: maeMa !== null ? parseFloat(maeMa.toFixed(4)) : null,
-      isRecommended: recommendedModel === 'ma'
+      isRecommended: recommendedModel === 'ma',
+      alertTriggered: maAlert.alertTriggered,
+      alertDirection: maAlert.alertDirection,
+      predictedArrivalTime: maAlert.predictedArrivalTime
     }
   };
 
@@ -327,37 +409,9 @@ function predictForCCP(ccpId) {
     : (recommendedModel === 'ema' && emaResult
       ? emaResult.emaSlope
       : (maResult ? maResult.maSlope : 0));
-  const effectiveR2 = lrResult ? lrResult.r2 : 0;
-
-  let alertTriggered = false;
-  let alertDirection = null;
-  let predictedArrivalTime = null;
-
-  if (predictedTemp !== null) {
-    if (effectiveSlope > 0 && predictedTemp > ccp.complianceMax) {
-      alertTriggered = true;
-      alertDirection = 'upper';
-      const lastReadingMs = new Date(recent[recent.length - 1].timestamp).getTime();
-      const lastTemp = recent[recent.length - 1].temperature;
-      if (lastTemp < ccp.complianceMax && effectiveSlope > 0) {
-        const secondsToBreach = (ccp.complianceMax - lastTemp) / effectiveSlope;
-        predictedArrivalTime = new Date(lastReadingMs + secondsToBreach * 1000).toISOString();
-      } else {
-        predictedArrivalTime = new Date(lastReadingMs).toISOString();
-      }
-    } else if (effectiveSlope < 0 && predictedTemp < ccp.complianceMin) {
-      alertTriggered = true;
-      alertDirection = 'lower';
-      const lastReadingMs = new Date(recent[recent.length - 1].timestamp).getTime();
-      const lastTemp = recent[recent.length - 1].temperature;
-      if (lastTemp > ccp.complianceMin && effectiveSlope < 0) {
-        const secondsToBreach = (ccp.complianceMin - lastTemp) / effectiveSlope;
-        predictedArrivalTime = new Date(lastReadingMs + secondsToBreach * 1000).toISOString();
-      } else {
-        predictedArrivalTime = new Date(lastReadingMs).toISOString();
-      }
-    }
-  }
+  const effectiveR2 = recommendedModel === 'linear' && lrResult
+    ? lrResult.r2
+    : null;
 
   return {
     ccpId,
@@ -366,12 +420,13 @@ function predictForCCP(ccpId) {
     complianceMax: ccp.complianceMax,
     slope: parseFloat(effectiveSlope.toFixed(6)),
     slopeUnit: '°C/s',
-    r2: parseFloat(effectiveR2.toFixed(6)),
+    r2: effectiveR2 !== null ? parseFloat(effectiveR2.toFixed(6)) : null,
     predictedTemperature: predictedTemp !== null ? parseFloat(predictedTemp.toFixed(2)) : null,
     predictMinutes,
     alertTriggered,
     alertDirection,
     predictedArrivalTime,
+    alertModels,
     sampleCount: recent.length,
     insufficientData: false,
     recommendedModel,
