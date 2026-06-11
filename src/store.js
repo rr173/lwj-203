@@ -1756,6 +1756,21 @@ class DataStore {
 
   createSOPExecution(params) {
     const { sopDefinitionId, sopName, scene, referenceType, referenceId, ccpId, operator, eventTime } = params;
+
+    if (referenceType === 'deviation' && referenceId) {
+      const deviation = this.getDeviation(referenceId);
+      if (deviation) {
+        const requiredScene = this.getSceneForDeviationClose(deviation.level);
+        if (scene !== requiredScene) {
+          return {
+            error: `偏差等级不匹配: ${deviation.level} 级别偏差必须使用场景 ${requiredScene}，当前请求场景: ${scene}`,
+            requiredScene,
+            deviationLevel: deviation.level
+          };
+        }
+      }
+    }
+
     const sop = this.getSOPForScene(scene);
     if (!sop) return null;
 
@@ -1841,6 +1856,28 @@ class DataStore {
       if (exec.status !== 'in_progress') continue;
       const currentStep = exec.steps.find(s => s.stepIndex === exec.currentStepIndex);
       if (!currentStep || currentStep.status !== 'in_progress') continue;
+
+      const requiredRole = currentStep.requiredRole;
+      let canSeeStep = false;
+
+      if (!requiredRole) {
+        if (exec.createdBy === operator) {
+          canSeeStep = true;
+        }
+      } else {
+        const isRoleMatch =
+          (requiredRole === 'supervisor' && operator.includes('主管')) ||
+          (requiredRole === 'director' && operator.includes('总监'));
+
+        const hasDelegation = this.getActiveDelegationsForDelegatee(operator, exec.scene, requiredRole).length > 0;
+
+        if (isRoleMatch || hasDelegation) {
+          canSeeStep = true;
+        }
+      }
+
+      if (!canSeeStep) continue;
+
       pending.push({
         executionId: exec.id,
         sopName: exec.sopName,
@@ -2445,6 +2482,8 @@ class DataStore {
       newSteps.push(newStep);
     }
 
+    let newStatus = 'in_progress';
+    let newCompletedAt = null;
     const firstPendingStep = newSteps.find(s => s.status === 'pending');
     if (firstPendingStep) {
       newCurrentStepIndex = firstPendingStep.stepIndex;
@@ -2455,6 +2494,8 @@ class DataStore {
       }
     } else {
       newCurrentStepIndex = newSteps.length;
+      newStatus = 'completed';
+      newCompletedAt = now;
     }
 
     const historyId = this.generateId('sopEscalationHistory');
@@ -2470,7 +2511,8 @@ class DataStore {
       triggeredAt: now,
       stepIndexAtTime: currentStepIdx,
       stepNameAtTime: currentStep ? currentStep.name : '',
-      preservedCompletedSteps: newSteps.filter(s => s.status === 'completed').length
+      preservedCompletedSteps: newSteps.filter(s => s.status === 'completed').length,
+      autoCompleted: newStatus === 'completed'
     };
 
     let historyList = this.sopExecutionEscalationHistory.get(executionId) || [];
@@ -2481,6 +2523,10 @@ class DataStore {
     exec.sopName = targetSOP.name;
     exec.steps = newSteps;
     exec.currentStepIndex = newCurrentStepIndex;
+    exec.status = newStatus;
+    if (newCompletedAt) {
+      exec.completedAt = newCompletedAt;
+    }
 
     if (!exec.escalationCount) {
       exec.escalationCount = 0;
@@ -2570,6 +2616,8 @@ class DataStore {
     }
 
     let newCurrentStepIndex = 1;
+    let newStatus = 'in_progress';
+    let newCompletedAt = null;
     const firstIncompleteStep = newSteps.find(s => s.status === 'pending');
     if (firstIncompleteStep) {
       newCurrentStepIndex = firstIncompleteStep.stepIndex;
@@ -2580,6 +2628,8 @@ class DataStore {
       }
     } else {
       newCurrentStepIndex = newSteps.length;
+      newStatus = 'completed';
+      newCompletedAt = now;
     }
 
     const historyId = this.generateId('sopEscalationHistory');
@@ -2595,7 +2645,8 @@ class DataStore {
       triggeredAt: now,
       stepIndexAtTime: currentStepIdx,
       stepNameAtTime: currentStep ? currentStep.name : '',
-      preservedCompletedSteps: newSteps.filter(s => s.status === 'completed').length
+      preservedCompletedSteps: newSteps.filter(s => s.status === 'completed').length,
+      autoCompleted: newStatus === 'completed'
     };
 
     let historyList = this.sopExecutionEscalationHistory.get(executionId) || [];
@@ -2606,6 +2657,10 @@ class DataStore {
     exec.sopName = targetSOP.name;
     exec.steps = newSteps;
     exec.currentStepIndex = newCurrentStepIndex;
+    exec.status = newStatus;
+    if (newCompletedAt) {
+      exec.completedAt = newCompletedAt;
+    }
 
     if (!exec.deescalationCount) {
       exec.deescalationCount = 0;

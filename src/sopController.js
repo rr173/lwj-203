@@ -115,6 +115,10 @@ function startSOPExecution(req, res) {
     return res.status(500).json({ error: 'SOP执行实例创建失败' });
   }
 
+  if (execution.error) {
+    return res.status(400).json(execution);
+  }
+
   broadcastSOPExecution(execution, 'started');
   res.status(201).json(execution);
 }
