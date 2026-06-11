@@ -17,6 +17,8 @@ const predictionController = require('./predictionController');
 const energyController = require('./energyController');
 const groupController = require('./groupController');
 const workOrderController = require('./workOrderController');
+const sopController = require('./sopController');
+const store = require('./store');
 const { generateDemoData } = require('./demoData');
 const { startScheduler } = require('./scheduler');
 const { initWebSocket } = require('./websocket');
@@ -164,12 +166,30 @@ app.post('/api/work-orders/:id/reassign', workOrderController.reassignWorkOrder)
 app.get('/api/timeout-alerts', workOrderController.getTimeoutAlerts);
 app.post('/api/timeout-alerts/:id/acknowledge', workOrderController.acknowledgeTimeoutAlert);
 
+app.post('/api/sop-definitions', sopController.createSOPDefinition);
+app.get('/api/sop-definitions', sopController.getAllSOPDefinitions);
+app.get('/api/sop-definitions/:id', sopController.getSOPDefinition);
+app.put('/api/sop-definitions/:id', sopController.updateSOPDefinition);
+app.delete('/api/sop-definitions/:id', sopController.deleteSOPDefinition);
+app.post('/api/sop-executions', sopController.startSOPExecution);
+app.post('/api/sop-executions/:executionId/complete-step', sopController.completeSOPStep);
+app.get('/api/sop-executions', sopController.getAllSOPExecutions);
+app.get('/api/sop-executions/:id', sopController.getSOPExecution);
+app.get('/api/sop-progress/:referenceType/:referenceId', sopController.getSOPExecutionProgress);
+app.get('/api/sop-pending-steps/:operator', sopController.getOperatorPendingSteps);
+app.post('/api/sop-check-compliance', sopController.checkCompliance);
+app.post('/api/sop-executions/:executionId/cancel', sopController.cancelSOPExecution);
+app.get('/api/sop-statistics', sopController.getSOPStatistics);
+app.get('/api/sop-timeout-alerts', sopController.getSOPTimeoutAlerts);
+app.post('/api/sop-timeout-alerts/:id/acknowledge', sopController.acknowledgeSOPTimeoutAlert);
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: '服务器内部错误' });
 });
 
 generateDemoData();
+store.initializeDefaultSOPs();
 
 const server = http.createServer(app);
 initWebSocket(server);
@@ -219,6 +239,24 @@ server.listen(PORT, () => {
 ║  POST   /api/work-orders/:id/reassign (转派工单)              ║
 ║  GET    /api/timeout-alerts (超时告警列表)                    ║
 ║  POST   /api/timeout-alerts/:id/acknowledge (确认超时告警)    ║
+║                                                              ║
+║  === SOP执行引擎与操作合规检测 ===                            ║
+║  POST   /api/sop-definitions (创建SOP定义)                   ║
+║  GET    /api/sop-definitions (SOP定义列表)                    ║
+║  GET    /api/sop-definitions/:id (SOP定义详情)               ║
+║  PUT    /api/sop-definitions/:id (更新SOP定义)               ║
+║  DELETE /api/sop-definitions/:id (删除SOP定义)               ║
+║  POST   /api/sop-executions (启动SOP执行)                    ║
+║  POST   /api/sop-executions/:id/complete-step (完成步骤)     ║
+║  GET    /api/sop-executions (SOP执行列表)                    ║
+║  GET    /api/sop-executions/:id (执行实例详情)               ║
+║  GET    /api/sop-progress/:refType/:refId (执行进度查询)      ║
+║  GET    /api/sop-pending-steps/:operator (操作员待办)         ║
+║  POST   /api/sop-check-compliance (合规检测)                  ║
+║  POST   /api/sop-executions/:id/cancel (取消SOP执行)         ║
+║  GET    /api/sop-statistics (执行时效统计)                    ║
+║  GET    /api/sop-timeout-alerts (SOP超时告警)                ║
+║  POST   /api/sop-timeout-alerts/:id/acknowledge (确认超时)   ║
 ╚══════════════════════════════════════════════════════════════╝
   `);
 });

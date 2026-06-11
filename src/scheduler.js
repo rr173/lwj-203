@@ -3,6 +3,7 @@ const { checkAllCCPsHeartbeat, getMinReportingFrequency } = require('./heartbeat
 const { runEnergyAnomalyDetectionForAll, recalculateAllCorrelations } = require('./energyController');
 const { checkAndEscalateGroupAlerts } = require('./groupAlertEngine');
 const { checkWorkOrderOverdue } = require('./workOrderController');
+const { checkSOPStepTimeouts } = require('./sopController');
 
 const DEVIATION_CHECK_INTERVAL = 10 * 1000;
 const HEARTBEAT_BASE_INTERVAL = 1000;
@@ -11,6 +12,7 @@ const ENERGY_ANOMALY_CHECK_INTERVAL = 5 * 60 * 1000;
 const CORRELATION_RECALC_INTERVAL = 30 * 60 * 1000;
 const GROUP_ESCALATION_CHECK_INTERVAL = 10 * 1000;
 const WORKORDER_OVERDUE_CHECK_INTERVAL = 30 * 1000;
+const SOP_TIMEOUT_CHECK_INTERVAL = 15 * 1000;
 
 function startScheduler() {
   console.log(`启动偏差升级定时检查服务，间隔: ${DEVIATION_CHECK_INTERVAL / 1000}秒`);
@@ -82,6 +84,19 @@ function startScheduler() {
       console.error('工单超时检测出错:', error);
     }
   }, WORKORDER_OVERDUE_CHECK_INTERVAL);
+
+  console.log(`启动SOP步骤超时检测服务，间隔: ${SOP_TIMEOUT_CHECK_INTERVAL / 1000}秒`);
+  setInterval(() => {
+    try {
+      const timeouts = checkSOPStepTimeouts();
+      if (timeouts.length > 0) {
+        console.log(`[${new Date().toISOString()}] 检测到 ${timeouts.length} 个SOP步骤超时:`);
+        timeouts.forEach(t => console.log(`  - 执行实例 ${t.execution.id} 步骤${t.alert.stepIndex}: ${t.alert.stepName} (SOP: ${t.alert.sopName})`));
+      }
+    } catch (error) {
+      console.error('SOP步骤超时检测出错:', error);
+    }
+  }, SOP_TIMEOUT_CHECK_INTERVAL);
 
   startHeartbeatScheduler();
 }

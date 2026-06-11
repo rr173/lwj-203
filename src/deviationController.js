@@ -1,5 +1,6 @@
 const store = require('./store');
 const { evaluateGroupForCCP } = require('./groupAlertEngine');
+const { broadcastSOPExecution } = require('./websocket');
 
 function getAllDeviations(req, res) {
   const { status, ccpId, productionLine, startTime, endTime, page = 1, pageSize = 20 } = req.query;
@@ -93,6 +94,15 @@ function closeDeviation(req, res) {
 
   if (!closedBy) {
     return res.status(400).json({ error: '关闭人不能为空' });
+  }
+
+  const scene = store.getSceneForDeviationClose(deviation.level);
+  const compliance = store.checkSOPCompliance(scene, 'deviation', deviation.id);
+  if (!compliance.compliant) {
+    return res.status(403).json({
+      error: `操作被拒绝: ${compliance.reason}`,
+      sopCompliance: compliance
+    });
   }
 
   const updated = store.updateDeviation(req.params.id, {

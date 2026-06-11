@@ -234,6 +234,14 @@ function addRecallExecution(req, res) {
     return res.status(400).json({ error: '只有召回状态的批次可以录入回收记录' });
   }
 
+  const compliance = store.checkSOPCompliance('recall_execute', 'recall_batch', batchId);
+  if (!compliance.compliant) {
+    return res.status(403).json({
+      error: `操作被拒绝: ${compliance.reason}`,
+      sopCompliance: compliance
+    });
+  }
+
   const { reason, affectedQuantity, recoveredQuantity, channel, responsiblePerson } = req.body;
   if (!reason || !affectedQuantity || !recoveredQuantity || !channel || !responsiblePerson) {
     return res.status(400).json({ error: '召回原因、影响数量、已回收数量、回收渠道和负责人不能为空' });

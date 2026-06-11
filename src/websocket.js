@@ -223,6 +223,72 @@ function broadcastTimeoutAlert(alert) {
   });
 }
 
+function broadcastSOPExecution(execution, changeType) {
+  broadcast({
+    type: 'sop_execution',
+    id: `sop_${execution.id}_${Date.now()}`,
+    data: {
+      id: execution.id,
+      sopName: execution.sopName,
+      scene: execution.scene,
+      referenceType: execution.referenceType,
+      referenceId: execution.referenceId,
+      ccpId: execution.ccpId,
+      status: execution.status,
+      currentStepIndex: execution.currentStepIndex,
+      totalSteps: execution.steps.length,
+      completedSteps: execution.steps.filter(s => s.status === 'completed').length,
+      changeType,
+      hasTimeout: execution.timeoutAlerts.length > 0,
+      startedAt: execution.startedAt,
+      completedAt: execution.completedAt,
+    },
+  });
+}
+
+function broadcastSOPStepCompleted(execution, stepIndex, operator) {
+  const step = execution.steps.find(s => s.stepIndex === stepIndex);
+  broadcast({
+    type: 'sop_step_completed',
+    id: `sop_sc_${execution.id}_${stepIndex}_${Date.now()}`,
+    data: {
+      executionId: execution.id,
+      sopName: execution.sopName,
+      scene: execution.scene,
+      referenceType: execution.referenceType,
+      referenceId: execution.referenceId,
+      stepIndex,
+      stepName: step ? step.name : '',
+      actionType: step ? step.actionType : '',
+      operator,
+      isExecutionComplete: execution.status === 'completed',
+      nextStepIndex: execution.status !== 'completed' ? execution.currentStepIndex : null,
+    },
+  });
+}
+
+function broadcastSOPTimeoutAlert(alert) {
+  broadcast({
+    type: 'sop_timeout_alert',
+    id: `sop_ta_${alert.id}_${Date.now()}`,
+    data: {
+      id: alert.id,
+      executionId: alert.executionId,
+      sopName: alert.sopName,
+      scene: alert.scene,
+      referenceType: alert.referenceType,
+      referenceId: alert.referenceId,
+      ccpId: alert.ccpId,
+      ccpName: alert.ccpName,
+      stepIndex: alert.stepIndex,
+      stepName: alert.stepName,
+      actionType: alert.actionType,
+      deadline: alert.deadline,
+      alertedAt: alert.alertedAt,
+    },
+  });
+}
+
 module.exports = {
   initWebSocket,
   broadcast,
@@ -238,4 +304,7 @@ module.exports = {
   broadcastWorkOrder,
   broadcastWorkOrderStatusChange,
   broadcastTimeoutAlert,
+  broadcastSOPExecution,
+  broadcastSOPStepCompleted,
+  broadcastSOPTimeoutAlert,
 };

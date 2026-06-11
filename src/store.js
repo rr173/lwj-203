@@ -51,6 +51,68 @@ class DataStore {
     this.nextWorkOrderId = 1;
     this.workOrderTimeoutAlerts = new Map();
     this.nextTimeoutAlertId = 1;
+    this.sopDefinitions = new Map();
+    this.nextSopDefId = 1;
+    this.sopExecutions = new Map();
+    this.nextSopExecId = 1;
+    this.sopTimeoutAlerts = new Map();
+    this.nextSopTimeoutAlertId = 1;
+    this.defaultSOPs = {
+      'deviation_close_minor': {
+        name: '轻微偏差关闭流程',
+        description: '轻微偏差只需确认后关闭',
+        steps: [
+          { stepIndex: 1, name: '确认偏差', actionType: 'confirm', description: '操作员确认偏差已自动恢复', timeLimitMinutes: 30, preconditions: [], requiredRole: null },
+          { stepIndex: 2, name: '关闭偏差', actionType: 'confirm', description: '确认关闭偏差记录', timeLimitMinutes: 10, preconditions: [{ type: 'previous_step_completed', stepIndex: 1 }], requiredRole: null }
+        ]
+      },
+      'deviation_close_moderate': {
+        name: '一般偏差关闭流程',
+        description: '一般偏差需现场确认+纠偏操作',
+        steps: [
+          { stepIndex: 1, name: '现场确认', actionType: 'confirm', description: '操作员到达现场确认偏差情况', timeLimitMinutes: 15, preconditions: [], requiredRole: null },
+          { stepIndex: 2, name: '纠偏操作', actionType: 'number_input', description: '执行纠偏操作并记录数据', timeLimitMinutes: 30, preconditions: [{ type: 'previous_step_completed', stepIndex: 1 }], requiredRole: null },
+          { stepIndex: 3, name: '主管签批', actionType: 'supervisor_approval', description: '主管审核确认纠偏结果', timeLimitMinutes: 60, preconditions: [{ type: 'previous_step_completed', stepIndex: 2 }], requiredRole: 'supervisor' }
+        ]
+      },
+      'deviation_close_critical': {
+        name: '严重偏差关闭流程',
+        description: '严重偏差需现场确认→纠偏操作→主管签批',
+        steps: [
+          { stepIndex: 1, name: '现场确认', actionType: 'photo_upload', description: '到达现场拍照确认偏差情况', timeLimitMinutes: 10, preconditions: [{ type: 'within_minutes_of_event', minutes: 30 }], requiredRole: null },
+          { stepIndex: 2, name: '纠偏操作', actionType: 'number_input', description: '执行应急纠偏并记录数据', timeLimitMinutes: 20, preconditions: [{ type: 'previous_step_completed', stepIndex: 1 }], requiredRole: null },
+          { stepIndex: 3, name: '主管签批', actionType: 'supervisor_approval', description: '主管审核确认纠偏结果', timeLimitMinutes: 30, preconditions: [{ type: 'previous_step_completed', stepIndex: 2 }], requiredRole: 'supervisor' }
+        ]
+      },
+      'deviation_close_severe': {
+        name: '致命偏差关闭流程',
+        description: '致命偏差需紧急确认→应急纠偏→主管签批→总监签批',
+        steps: [
+          { stepIndex: 1, name: '紧急现场确认', actionType: 'photo_upload', description: '10分钟内到达现场拍照确认', timeLimitMinutes: 10, preconditions: [{ type: 'within_minutes_of_event', minutes: 10 }], requiredRole: null },
+          { stepIndex: 2, name: '应急纠偏', actionType: 'number_input', description: '执行应急纠偏并记录关键数据', timeLimitMinutes: 15, preconditions: [{ type: 'previous_step_completed', stepIndex: 1 }], requiredRole: null },
+          { stepIndex: 3, name: '主管签批', actionType: 'supervisor_approval', description: '主管审核确认', timeLimitMinutes: 15, preconditions: [{ type: 'previous_step_completed', stepIndex: 2 }], requiredRole: 'supervisor' },
+          { stepIndex: 4, name: '总监签批', actionType: 'supervisor_approval', description: '质量总监最终审核', timeLimitMinutes: 30, preconditions: [{ type: 'previous_step_completed', stepIndex: 3 }], requiredRole: 'director' }
+        ]
+      },
+      'calibration_record': {
+        name: '校准记录流程',
+        description: '录入校准记录需确认+录入数据+主管签批',
+        steps: [
+          { stepIndex: 1, name: '确认校准环境', actionType: 'confirm', description: '确认校准环境符合要求', timeLimitMinutes: 15, preconditions: [{ type: 'ccp_status', status: 'normal' }], requiredRole: null },
+          { stepIndex: 2, name: '录入校准数据', actionType: 'number_input', description: '录入标准值和实测值', timeLimitMinutes: 10, preconditions: [{ type: 'previous_step_completed', stepIndex: 1 }], requiredRole: null },
+          { stepIndex: 3, name: '主管确认', actionType: 'supervisor_approval', description: '主管确认校准数据有效性', timeLimitMinutes: 60, preconditions: [{ type: 'previous_step_completed', stepIndex: 2 }], requiredRole: 'supervisor' }
+        ]
+      },
+      'recall_execute': {
+        name: '召回执行流程',
+        description: '执行产品召回需确认→隔离→主管签批',
+        steps: [
+          { stepIndex: 1, name: '确认召回范围', actionType: 'confirm', description: '确认受影响产品批次和范围', timeLimitMinutes: 30, preconditions: [], requiredRole: null },
+          { stepIndex: 2, name: '隔离受影响产品', actionType: 'photo_upload', description: '拍照记录隔离措施', timeLimitMinutes: 60, preconditions: [{ type: 'previous_step_completed', stepIndex: 1 }], requiredRole: null },
+          { stepIndex: 3, name: '主管签批', actionType: 'supervisor_approval', description: '主管确认召回执行到位', timeLimitMinutes: 60, preconditions: [{ type: 'previous_step_completed', stepIndex: 2 }], requiredRole: 'supervisor' }
+        ]
+      }
+    };
     this.workOrderTemplates = {
       minor: {
         name: '轻微偏差简易模板',
@@ -147,6 +209,12 @@ class DataStore {
         return `WO${String(this.nextWorkOrderId++).padStart(6, '0')}`;
       case 'timeoutAlert':
         return `TOA${String(this.nextTimeoutAlertId++).padStart(6, '0')}`;
+      case 'sopDef':
+        return `SOP${String(this.nextSopDefId++).padStart(4, '0')}`;
+      case 'sopExec':
+        return `SOP_EX${String(this.nextSopExecId++).padStart(6, '0')}`;
+      case 'sopTimeoutAlert':
+        return `SOP_TA${String(this.nextSopTimeoutAlertId++).padStart(6, '0')}`;
       default:
         return Date.now();
     }
@@ -1575,6 +1643,521 @@ class DataStore {
       byStatus,
       byLevel,
       monthlyTrend: trendArray
+    };
+  }
+
+  addSOPDefinition(sop) {
+    const id = this.generateId('sopDef');
+    const now = new Date().toISOString();
+    const steps = (sop.steps || []).map((step, idx) => ({
+      stepIndex: idx + 1,
+      name: step.name || `步骤${idx + 1}`,
+      actionType: step.actionType || 'confirm',
+      description: step.description || '',
+      timeLimitMinutes: step.timeLimitMinutes || 30,
+      preconditions: step.preconditions || [],
+      requiredRole: step.requiredRole || null
+    }));
+    const def = {
+      id,
+      name: sop.name,
+      description: sop.description || '',
+      scene: sop.scene,
+      steps,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.sopDefinitions.set(id, def);
+    return def;
+  }
+
+  getSOPDefinition(id) {
+    return this.sopDefinitions.get(id) || null;
+  }
+
+  getAllSOPDefinitions() {
+    return Array.from(this.sopDefinitions.values());
+  }
+
+  getSOPDefinitionsByScene(scene) {
+    return Array.from(this.sopDefinitions.values()).filter(d => d.scene === scene);
+  }
+
+  getActiveSOPDefinitionByScene(scene) {
+    return Array.from(this.sopDefinitions.values()).find(d => d.scene === scene && d.isActive);
+  }
+
+  updateSOPDefinition(id, updates) {
+    const def = this.sopDefinitions.get(id);
+    if (!def) return null;
+    const updated = { ...def, ...updates, updatedAt: new Date().toISOString() };
+    this.sopDefinitions.set(id, updated);
+    return updated;
+  }
+
+  deleteSOPDefinition(id) {
+    return this.sopDefinitions.delete(id);
+  }
+
+  initializeDefaultSOPs() {
+    for (const [scene, sop] of Object.entries(this.defaultSOPs)) {
+      const existing = this.getActiveSOPDefinitionByScene(scene);
+      if (!existing) {
+        this.addSOPDefinition({
+          name: sop.name,
+          description: sop.description,
+          scene,
+          steps: sop.steps
+        });
+      }
+    }
+  }
+
+  getSOPForScene(scene) {
+    const custom = this.getActiveSOPDefinitionByScene(scene);
+    if (custom) return custom;
+    const defaultSOP = this.defaultSOPs[scene];
+    if (!defaultSOP) return null;
+    return {
+      id: `DEFAULT_${scene}`,
+      name: defaultSOP.name,
+      description: defaultSOP.description,
+      scene,
+      steps: defaultSOP.steps,
+      isActive: true,
+      isDefault: true
+    };
+  }
+
+  getSceneForDeviationClose(deviationLevel) {
+    const map = {
+      minor: 'deviation_close_minor',
+      moderate: 'deviation_close_moderate',
+      critical: 'deviation_close_critical',
+      severe: 'deviation_close_severe'
+    };
+    return map[deviationLevel] || 'deviation_close_moderate';
+  }
+
+  createSOPExecution(params) {
+    const { sopDefinitionId, sopName, scene, referenceType, referenceId, ccpId, operator, eventTime } = params;
+    const sop = this.getSOPForScene(scene);
+    if (!sop) return null;
+
+    const id = this.generateId('sopExec');
+    const now = new Date().toISOString();
+    const refTime = eventTime ? new Date(eventTime).getTime() : Date.now();
+
+    const steps = sop.steps.map(step => {
+      const startedAt = step.stepIndex === 1 ? now : null;
+      const deadline = (step.stepIndex === 1 && step.timeLimitMinutes)
+        ? new Date(refTime + step.timeLimitMinutes * 60 * 1000).toISOString()
+        : null;
+      return {
+        stepIndex: step.stepIndex,
+        name: step.name,
+        actionType: step.actionType,
+        description: step.description,
+        timeLimitMinutes: step.timeLimitMinutes,
+        preconditions: step.preconditions,
+        requiredRole: step.requiredRole,
+        status: step.stepIndex === 1 ? 'in_progress' : 'pending',
+        startedAt,
+        completedAt: null,
+        completedBy: null,
+        inputData: null,
+        deadline,
+        isOverdue: false
+      };
+    });
+
+    const execution = {
+      id,
+      sopDefinitionId: sopDefinitionId || sop.id,
+      sopName: sopName || sop.name,
+      scene,
+      referenceType,
+      referenceId,
+      ccpId: ccpId || null,
+      status: 'in_progress',
+      currentStepIndex: 1,
+      steps,
+      startedAt: now,
+      completedAt: null,
+      timeoutAlerts: [],
+      createdBy: operator || 'system',
+      createdAt: now,
+      eventTime: eventTime || now
+    };
+    this.sopExecutions.set(id, execution);
+    return execution;
+  }
+
+  getSOPExecution(id) {
+    return this.sopExecutions.get(id) || null;
+  }
+
+  getAllSOPExecutions() {
+    return Array.from(this.sopExecutions.values());
+  }
+
+  getSOPExecutionsByReference(referenceType, referenceId) {
+    return Array.from(this.sopExecutions.values()).filter(
+      e => e.referenceType === referenceType && e.referenceId === referenceId
+    );
+  }
+
+  getActiveSOPExecutionByReference(referenceType, referenceId) {
+    return Array.from(this.sopExecutions.values()).find(
+      e => e.referenceType === referenceType && e.referenceId === referenceId && e.status === 'in_progress'
+    );
+  }
+
+  getSOPExecutionsByOperator(operator) {
+    return Array.from(this.sopExecutions.values()).filter(
+      e => e.status === 'in_progress' && e.steps.some(s => s.status === 'in_progress' && (s.completedBy === operator || !s.completedBy))
+    );
+  }
+
+  getPendingSOPStepsForOperator(operator) {
+    const executions = this.getAllSOPExecutions();
+    const pending = [];
+    for (const exec of executions) {
+      if (exec.status !== 'in_progress') continue;
+      const currentStep = exec.steps.find(s => s.stepIndex === exec.currentStepIndex);
+      if (!currentStep || currentStep.status !== 'in_progress') continue;
+      pending.push({
+        executionId: exec.id,
+        sopName: exec.sopName,
+        scene: exec.scene,
+        referenceType: exec.referenceType,
+        referenceId: exec.referenceId,
+        ccpId: exec.ccpId,
+        stepIndex: currentStep.stepIndex,
+        stepName: currentStep.name,
+        actionType: currentStep.actionType,
+        description: currentStep.description,
+        timeLimitMinutes: currentStep.timeLimitMinutes,
+        deadline: currentStep.deadline,
+        isOverdue: currentStep.isOverdue,
+        requiredRole: currentStep.requiredRole,
+        startedAt: currentStep.startedAt,
+        createdBy: exec.createdBy
+      });
+    }
+    pending.sort((a, b) => {
+      if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+      if (a.deadline && b.deadline) return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+      return 0;
+    });
+    return pending;
+  }
+
+  checkStepPreconditions(executionId, stepIndex) {
+    const exec = this.sopExecutions.get(executionId);
+    if (!exec) return { passed: false, reason: 'SOP执行实例不存在' };
+    const step = exec.steps.find(s => s.stepIndex === stepIndex);
+    if (!step) return { passed: false, reason: '步骤不存在' };
+
+    for (const cond of step.preconditions) {
+      switch (cond.type) {
+        case 'previous_step_completed': {
+          const prevStep = exec.steps.find(s => s.stepIndex === cond.stepIndex);
+          if (!prevStep || prevStep.status !== 'completed') {
+            return { passed: false, reason: `前置步骤${cond.stepIndex}未完成`, blockedAtStep: cond.stepIndex };
+          }
+          break;
+        }
+        case 'within_minutes_of_event': {
+          const eventMs = new Date(exec.eventTime).getTime();
+          const elapsed = (Date.now() - eventMs) / 60000;
+          if (elapsed > cond.minutes) {
+            return { passed: false, reason: `已超过事件发生后${cond.minutes}分钟的时限（已过${elapsed.toFixed(1)}分钟）` };
+          }
+          break;
+        }
+        case 'ccp_status': {
+          if (!exec.ccpId) break;
+          const ccp = this.ccps.get(exec.ccpId);
+          if (!ccp) {
+            return { passed: false, reason: `CCP ${exec.ccpId} 不存在` };
+          }
+          if (ccp.status !== cond.status) {
+            return { passed: false, reason: `CCP当前状态为${ccp.status}，要求状态为${cond.status}` };
+          }
+          break;
+        }
+      }
+    }
+    return { passed: true };
+  }
+
+  completeSOPStep(executionId, stepIndex, operator, inputData) {
+    const exec = this.sopExecutions.get(executionId);
+    if (!exec) return null;
+    if (exec.status !== 'in_progress') return null;
+    if (exec.currentStepIndex !== stepIndex) return null;
+
+    const step = exec.steps.find(s => s.stepIndex === stepIndex);
+    if (!step || step.status !== 'in_progress') return null;
+
+    const precondition = this.checkStepPreconditions(executionId, stepIndex);
+    if (!precondition.passed) {
+      return { error: precondition.reason, blockedAtStep: precondition.blockedAtStep };
+    }
+
+    const now = new Date().toISOString();
+    step.status = 'completed';
+    step.completedAt = now;
+    step.completedBy = operator;
+    if (inputData !== undefined && inputData !== null) {
+      step.inputData = inputData;
+    }
+
+    const allCompleted = exec.steps.every(s => s.status === 'completed');
+    if (allCompleted) {
+      exec.status = 'completed';
+      exec.completedAt = now;
+      exec.currentStepIndex = stepIndex;
+    } else {
+      const nextStepIndex = stepIndex + 1;
+      const nextStep = exec.steps.find(s => s.stepIndex === nextStepIndex);
+      if (nextStep) {
+        nextStep.status = 'in_progress';
+        nextStep.startedAt = now;
+        if (nextStep.timeLimitMinutes) {
+          nextStep.deadline = new Date(Date.now() + nextStep.timeLimitMinutes * 60 * 1000).toISOString();
+        }
+        exec.currentStepIndex = nextStepIndex;
+      }
+    }
+
+    this.sopExecutions.set(executionId, exec);
+    return exec;
+  }
+
+  checkSOPCompliance(scene, referenceType, referenceId) {
+    const executions = this.getSOPExecutionsByReference(referenceType, referenceId);
+    const activeExec = executions.find(e => e.status === 'in_progress');
+    const completedExec = executions.find(e => e.status === 'completed');
+
+    if (!activeExec && !completedExec) {
+      return { compliant: false, reason: '该操作没有关联的SOP执行实例，需先启动SOP流程', requiresSOP: true, scene };
+    }
+    if (completedExec) {
+      return { compliant: true, executionId: completedExec.id };
+    }
+    const currentStep = activeExec.steps.find(s => s.stepIndex === activeExec.currentStepIndex);
+    return {
+      compliant: false,
+      reason: `SOP流程未完成，当前卡在步骤${activeExec.currentStepIndex}: ${currentStep ? currentStep.name : '未知'}`,
+      executionId: activeExec.id,
+      sopName: activeExec.sopName,
+      currentStepIndex: activeExec.currentStepIndex,
+      currentStepName: currentStep ? currentStep.name : '',
+      currentStepActionType: currentStep ? currentStep.actionType : '',
+      totalSteps: activeExec.steps.length,
+      completedSteps: activeExec.steps.filter(s => s.status === 'completed').length,
+      requiresSOP: false
+    };
+  }
+
+  markSOPStepTimeout(executionId, stepIndex) {
+    const exec = this.sopExecutions.get(executionId);
+    if (!exec) return null;
+    const step = exec.steps.find(s => s.stepIndex === stepIndex);
+    if (!step || step.status !== 'in_progress') return null;
+    if (step.isOverdue) return null;
+
+    const now = new Date().toISOString();
+    step.isOverdue = true;
+    step.status = 'timed_out';
+
+    const alert = this.createSOPTimeoutAlert(exec, step);
+
+    exec.timeoutAlerts.push({
+      stepIndex,
+      stepName: step.name,
+      alertedAt: now,
+      alertId: alert.id
+    });
+
+    this.sopExecutions.set(executionId, exec);
+    return { execution: exec, alert };
+  }
+
+  createSOPTimeoutAlert(execution, step) {
+    const id = this.generateId('sopTimeoutAlert');
+    const now = new Date().toISOString();
+    const ccp = execution.ccpId ? this.ccps.get(execution.ccpId) : null;
+    const alert = {
+      id,
+      executionId: execution.id,
+      sopName: execution.sopName,
+      scene: execution.scene,
+      referenceType: execution.referenceType,
+      referenceId: execution.referenceId,
+      ccpId: execution.ccpId,
+      ccpName: ccp ? ccp.name : '',
+      stepIndex: step.stepIndex,
+      stepName: step.name,
+      actionType: step.actionType,
+      deadline: step.deadline,
+      status: 'active',
+      alertedAt: now,
+      acknowledgedAt: null,
+      acknowledgedBy: null
+    };
+    this.sopTimeoutAlerts.set(id, alert);
+    return alert;
+  }
+
+  checkSOPStepTimeouts() {
+    const now = Date.now();
+    const results = [];
+    const executions = Array.from(this.sopExecutions.values()).filter(e => e.status === 'in_progress');
+
+    for (const exec of executions) {
+      const currentStep = exec.steps.find(s => s.stepIndex === exec.currentStepIndex);
+      if (!currentStep || currentStep.status !== 'in_progress' || !currentStep.deadline) continue;
+      if (now > new Date(currentStep.deadline).getTime() && !currentStep.isOverdue) {
+        const result = this.markSOPStepTimeout(exec.id, currentStep.stepIndex);
+        if (result) results.push(result);
+      }
+    }
+    return results;
+  }
+
+  getSOPTimeoutAlerts(status) {
+    const alerts = Array.from(this.sopTimeoutAlerts.values());
+    if (status) return alerts.filter(a => a.status === status);
+    return alerts;
+  }
+
+  acknowledgeSOPTimeoutAlert(alertId, operator) {
+    const alert = this.sopTimeoutAlerts.get(alertId);
+    if (!alert) return null;
+    const now = new Date().toISOString();
+    const updated = { ...alert, status: 'acknowledged', acknowledgedAt: now, acknowledgedBy: operator };
+    this.sopTimeoutAlerts.set(alertId, updated);
+    return updated;
+  }
+
+  cancelSOPExecution(executionId, reason, operator) {
+    const exec = this.sopExecutions.get(executionId);
+    if (!exec) return null;
+    if (exec.status === 'completed' || exec.status === 'cancelled') return null;
+    const now = new Date().toISOString();
+    exec.status = 'cancelled';
+    exec.completedAt = now;
+    exec.cancelReason = reason || '';
+    exec.cancelledBy = operator || '';
+    this.sopExecutions.set(executionId, exec);
+    return exec;
+  }
+
+  getSOPExecutionStatistics(scene, startTime, endTime) {
+    let executions = this.getAllSOPExecutions();
+
+    if (scene) {
+      executions = executions.filter(e => e.scene === scene);
+    }
+    if (startTime) {
+      const startMs = new Date(startTime).getTime();
+      executions = executions.filter(e => new Date(e.createdAt).getTime() >= startMs);
+    }
+    if (endTime) {
+      const endMs = new Date(endTime).getTime();
+      executions = executions.filter(e => new Date(e.createdAt).getTime() <= endMs);
+    }
+
+    const total = executions.length;
+    const completed = executions.filter(e => e.status === 'completed').length;
+    const inProgress = executions.filter(e => e.status === 'in_progress').length;
+    const cancelled = executions.filter(e => e.status === 'cancelled').length;
+    const timedOutExecutions = executions.filter(e => e.timeoutAlerts.length > 0);
+
+    const stepStats = {};
+    for (const exec of executions) {
+      for (const step of exec.steps) {
+        const key = `${step.stepIndex}:${step.name}`;
+        if (!stepStats[key]) {
+          stepStats[key] = {
+            stepIndex: step.stepIndex,
+            stepName: step.name,
+            actionType: step.actionType,
+            totalOccurrences: 0,
+            completedCount: 0,
+            timedOutCount: 0,
+            totalDurationMinutes: 0,
+            durations: []
+          };
+        }
+        const stat = stepStats[key];
+        stat.totalOccurrences++;
+        if (step.status === 'completed') {
+          stat.completedCount++;
+          if (step.startedAt && step.completedAt) {
+            const dur = (new Date(step.completedAt).getTime() - new Date(step.startedAt).getTime()) / 60000;
+            stat.totalDurationMinutes += dur;
+            stat.durations.push(dur);
+          }
+        }
+        if (step.isOverdue) {
+          stat.timedOutCount++;
+        }
+      }
+    }
+
+    const stepAnalysis = Object.values(stepStats).map(stat => {
+      const avgDuration = stat.completedCount > 0 ? stat.totalDurationMinutes / stat.completedCount : 0;
+      const sorted = stat.durations.sort((a, b) => a - b);
+      const p50 = sorted.length > 0 ? sorted[Math.floor(sorted.length * 0.5)] : 0;
+      const p95 = sorted.length > 0 ? sorted[Math.floor(sorted.length * 0.95)] : 0;
+      const timeoutRate = stat.totalOccurrences > 0 ? stat.timedOutCount / stat.totalOccurrences : 0;
+      return {
+        stepIndex: stat.stepIndex,
+        stepName: stat.stepName,
+        actionType: stat.actionType,
+        totalOccurrences: stat.totalOccurrences,
+        completedCount: stat.completedCount,
+        timedOutCount: stat.timedOutCount,
+        timeoutRate: parseFloat(timeoutRate.toFixed(4)),
+        avgDurationMinutes: parseFloat(avgDuration.toFixed(2)),
+        p50DurationMinutes: parseFloat(p50.toFixed(2)),
+        p95DurationMinutes: parseFloat(p95.toFixed(2))
+      };
+    });
+
+    stepAnalysis.sort((a, b) => b.avgDurationMinutes - a.avgDurationMinutes);
+    const bottleneckStep = stepAnalysis.length > 0 ? stepAnalysis[0] : null;
+    const highestTimeoutStep = [...stepAnalysis].sort((a, b) => b.timeoutRate - a.timeoutRate)[0] || null;
+
+    const sceneBreakdown = {};
+    for (const exec of executions) {
+      if (!sceneBreakdown[exec.scene]) {
+        sceneBreakdown[exec.scene] = { total: 0, completed: 0, timedOut: 0 };
+      }
+      sceneBreakdown[exec.scene].total++;
+      if (exec.status === 'completed') sceneBreakdown[exec.scene].completed++;
+      if (exec.timeoutAlerts.length > 0) sceneBreakdown[exec.scene].timedOut++;
+    }
+
+    return {
+      summary: {
+        total,
+        completed,
+        inProgress,
+        cancelled,
+        timedOut: timedOutExecutions.length,
+        completionRate: total > 0 ? parseFloat((completed / total).toFixed(4)) : 0,
+        timeoutRate: total > 0 ? parseFloat((timedOutExecutions.length / total).toFixed(4)) : 0
+      },
+      stepAnalysis,
+      bottleneckStep,
+      highestTimeoutStep,
+      sceneBreakdown
     };
   }
 }

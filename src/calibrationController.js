@@ -15,6 +15,14 @@ function addCalibration(req, res) {
     return res.status(400).json({ error: '校准人员不能为空' });
   }
 
+  const compliance = store.checkSOPCompliance('calibration_record', 'calibration_ccp', ccpId);
+  if (!compliance.compliant) {
+    return res.status(403).json({
+      error: `操作被拒绝: ${compliance.reason}`,
+      sopCompliance: compliance
+    });
+  }
+
   const record = store.addCalibration(ccpId, {
     calibrationDate,
     standardValue,
