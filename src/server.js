@@ -183,6 +183,28 @@ app.get('/api/sop-statistics', sopController.getSOPStatistics);
 app.get('/api/sop-timeout-alerts', sopController.getSOPTimeoutAlerts);
 app.post('/api/sop-timeout-alerts/:id/acknowledge', sopController.acknowledgeSOPTimeoutAlert);
 
+app.post('/api/sop-escalation-paths', sopController.createSOPEscalationPath);
+app.get('/api/sop-escalation-paths', sopController.getAllSOPEscalationPaths);
+app.get('/api/sop-escalation-paths/:id', sopController.getSOPEscalationPath);
+app.put('/api/sop-escalation-paths/:id', sopController.updateSOPEscalationPath);
+app.delete('/api/sop-escalation-paths/:id', sopController.deleteSOPEscalationPath);
+
+app.post('/api/sop-delegations', sopController.createSOPDelegation);
+app.get('/api/sop-delegations', sopController.getAllSOPDelegations);
+app.get('/api/sop-delegations/:id', sopController.getSOPDelegation);
+app.put('/api/sop-delegations/:id', sopController.updateSOPDelegation);
+app.delete('/api/sop-delegations/:id', sopController.deleteSOPDelegation);
+app.get('/api/sop-delegations/delegator/:delegator', sopController.getDelegationsForDelegator);
+app.get('/api/sop-delegations/delegatee/:delegatee', sopController.getDelegationsForDelegatee);
+app.post('/api/sop-delegations/check', sopController.checkDelegationValidity);
+
+app.post('/api/sop-executions/:executionId/escalate', sopController.escalateSOPExecution);
+app.post('/api/sop-executions/:executionId/deescalate', sopController.deescalateSOPExecution);
+app.get('/api/sop-executions/:executionId/escalation-history', sopController.getSOPExecutionEscalationHistory);
+
+app.post('/api/sop-executions/:executionId/complete-step-delegated', sopController.completeSOPStepWithDelegation);
+app.get('/api/sop-executions/:executionId/delegation-records', sopController.getSOPExecutionDelegationRecords);
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: '服务器内部错误' });
@@ -190,6 +212,8 @@ app.use((err, req, res, next) => {
 
 generateDemoData();
 store.initializeDefaultSOPs();
+store.initializeDefaultEscalationPaths();
+store.initializeDefaultDelegations();
 
 const server = http.createServer(app);
 initWebSocket(server);

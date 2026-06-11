@@ -362,11 +362,321 @@ function acknowledgeSOPTimeoutAlert(req, res) {
 
 function checkSOPStepTimeouts() {
   const results = store.checkSOPStepTimeouts();
+  const autoEscalationResults = [];
+
   for (const result of results) {
     broadcastSOPTimeoutAlert(result.alert);
     broadcastSOPExecution(result.execution, 'step_timeout');
+
+    const escalationResult = store.checkAndAutoEscalate(result.execution.id);
+    if (escalationResult && !escalationResult.error) {
+      autoEscalationResults.push(escalationResult);
+      broadcastSOPExecution(escalationResult.execution, 'escalated');
+    }
   }
-  return results;
+
+  return { timeoutResults: results, autoEscalationResults };
+}
+
+function createSOPEscalationPath(req, res) {
+  const { name, description, scene, fromSOPDefinitionId, toSOPDefinitionId, direction, triggerCondition } = req.body;
+
+  if (!name) {
+    return res.status(400).json({ error: '升降级路径名称不能为空' });
+  }
+  if (!fromSOPDefinitionId || !toSOPDefinitionId) {
+    return res.status(400).json({ error: '源SOP和目标SOP定义ID不能为空' });
+  }
+  if (!direction || !['escalate', 'deescalate'].includes(direction)) {
+    return res.status(400).json({ error: 'direction必须是escalate或deescalate' });
+  }
+
+  const fromSOP = store.getSOPDefinition(fromSOPDefinitionId);
+  if (!fromSOP) {
+    return res.status(400).json({ error: '源SOP定义不存在' });
+  }
+
+  const toSOP = store.getSOPDefinition(toSOPDefinitionId);
+  if (!toSOP) {
+    return res.status(400).json({ error: '目标SOP定义不存在' });
+  }
+
+  const path = store.addSOPEscalationPath({
+    name,
+    description,
+    scene: scene || fromSOP.scene,
+    fromSOPDefinitionId,
+    fromSOPName: fromSOP.name,
+    toSOPDefinitionId,
+    toSOPName: toSOP.name,
+    direction,
+    triggerCondition: triggerCondition || { type: 'step_timeout' }
+  });
+
+  res.status(201).json(path);
+}
+
+function getAllSOPEscalationPaths(req, res) {
+  const { scene, direction } = req.query;
+  let paths = store.getAllSOPEscalationPaths();
+
+  if (scene) {
+    paths = paths.filter(p => p.scene === scene);
+  }
+  if (direction) {
+    paths = paths.filter(p => p.direction === direction);
+  }
+
+  res.json(paths);
+}
+
+function getSOPEscalationPath(req, res) {
+  const path = store.getSOPEscalationPath(req.params.id);
+  if (!path) {
+    return res.status(404).json({ error: '升降级路径不存在' });
+  }
+  res.json(path);
+}
+
+function updateSOPEscalationPath(req, res) {
+  const path = store.getSOPEscalationPath(req.params.id);
+  if (!path) {
+    return res.status(404).json({ error: '升降级路径不存在' });
+  }
+
+  const updated = store.updateSOPEscalationPath(req.params.id, req.body);
+  res.json(updated);
+}
+
+function deleteSOPEscalationPath(req, res) {
+  const path = store.getSOPEscalationPath(req.params.id);
+  if (!path) {
+    return res.status(404).json({ error: '升降级路径不存在' });
+  }
+  store.deleteSOPEscalationPath(req.params.id);
+  res.json({ message: '升降级路径已删除' });
+}
+
+function createSOPDelegation(req, res) {
+  const { delegator, delegatee, scene, requiredRole, startTime, endTime, description } = req.body;
+
+  if (!delegator || !delegatee) {
+    return res.status(400).json({ error: '委托人和被委托人不能为空' });
+  }
+
+  const delegation = store.addSOPDelegation({
+    delegator,
+    delegatee,
+    scene: scene || null,
+    requiredRole: requiredRole || null,
+    startTime,
+    endTime,
+    description,
+    createdBy: req.body.createdBy || 'system'
+  });
+
+  res.status(201).json(delegation);
+}
+
+function getAllSOPDelegations(req, res) {
+  const { delegator, delegatee, scene, requiredRole, isActive } = req.query;
+  let delegations = store.getAllSOPDelegations();
+
+  if (delegator) {
+    delegations = delegations.filter(d => d.delegator === delegator);
+  }
+  if (delegatee) {
+    delegations = delegations.filter(d => d.delegatee === delegatee);
+  }
+  if (scene) {
+    delegations = delegations.filter(d => d.scene === scene);
+  }
+  if (requiredRole) {
+    delegations = delegations.filter(d => d.requiredRole === requiredRole);
+  }
+  if (isActive !== undefined) {
+    const active = isActive === 'true';
+    const now = Date.now();
+    delegations = delegations.filter(d => {
+      if (d.isActive !== active && active) return false;
+      if (active) {
+        if (d.startTime && new Date(d.startTime).getTime() > now) return false;
+        if (d.endTime && new Date(d.endTime).getTime() < now) return false;
+      }
+      return true;
+    });
+  }
+
+  res.json(delegations);
+}
+
+function getSOPDelegation(req, res) {
+  const delegation = store.getSOPDelegation(req.params.id);
+  if (!delegation) {
+    return res.status(404).json({ error: '委托关系不存在' });
+  }
+  res.json(delegation);
+}
+
+function updateSOPDelegation(req, res) {
+  const delegation = store.getSOPDelegation(req.params.id);
+  if (!delegation) {
+    return res.status(404).json({ error: '委托关系不存在' });
+  }
+
+  const updated = store.updateSOPDelegation(req.params.id, req.body);
+  res.json(updated);
+}
+
+function deleteSOPDelegation(req, res) {
+  const delegation = store.getSOPDelegation(req.params.id);
+  if (!delegation) {
+    return res.status(404).json({ error: '委托关系不存在' });
+  }
+  store.deleteSOPDelegation(req.params.id);
+  res.json({ message: '委托关系已删除' });
+}
+
+function getDelegationsForDelegator(req, res) {
+  const { delegator } = req.params;
+  const { scene, requiredRole } = req.query;
+  const delegations = store.getActiveDelegationsForDelegator(
+    decodeURIComponent(delegator),
+    scene || null,
+    requiredRole || null
+  );
+  res.json({ delegator: decodeURIComponent(delegator), delegations });
+}
+
+function getDelegationsForDelegatee(req, res) {
+  const { delegatee } = req.params;
+  const { scene, requiredRole } = req.query;
+  const delegations = store.getActiveDelegationsForDelegatee(
+    decodeURIComponent(delegatee),
+    scene || null,
+    requiredRole || null
+  );
+  res.json({ delegatee: decodeURIComponent(delegatee), delegations });
+}
+
+function escalateSOPExecution(req, res) {
+  const { executionId } = req.params;
+  const { triggerReason, targetSOPDefinitionId } = req.body;
+
+  const execution = store.getSOPExecution(executionId);
+  if (!execution) {
+    return res.status(404).json({ error: 'SOP执行实例不存在' });
+  }
+
+  const result = store.escalateSOPExecution(executionId, triggerReason || 'manual', targetSOPDefinitionId);
+  if (result.error) {
+    return res.status(400).json({ error: result.error });
+  }
+
+  broadcastSOPExecution(result.execution, 'escalated');
+  res.json(result);
+}
+
+function deescalateSOPExecution(req, res) {
+  const { executionId } = req.params;
+  const { triggerReason, targetSOPDefinitionId } = req.body;
+
+  const execution = store.getSOPExecution(executionId);
+  if (!execution) {
+    return res.status(404).json({ error: 'SOP执行实例不存在' });
+  }
+
+  const result = store.deescalateSOPExecution(executionId, triggerReason || 'manual', targetSOPDefinitionId);
+  if (result.error) {
+    return res.status(400).json({ error: result.error });
+  }
+
+  broadcastSOPExecution(result.execution, 'deescalated');
+  res.json(result);
+}
+
+function getSOPExecutionEscalationHistory(req, res) {
+  const { executionId } = req.params;
+
+  const execution = store.getSOPExecution(executionId);
+  if (!execution) {
+    return res.status(404).json({ error: 'SOP执行实例不存在' });
+  }
+
+  const history = store.getSOPExecutionEscalationHistory(executionId);
+  res.json({ executionId, history });
+}
+
+function completeSOPStepWithDelegation(req, res) {
+  const { executionId } = req.params;
+  const { stepIndex, delegatee, inputData, delegator } = req.body;
+
+  const execution = store.getSOPExecution(executionId);
+  if (!execution) {
+    return res.status(404).json({ error: 'SOP执行实例不存在' });
+  }
+  if (execution.status !== 'in_progress') {
+    return res.status(400).json({ error: 'SOP执行实例不在进行中状态' });
+  }
+  if (!stepIndex) {
+    return res.status(400).json({ error: '步骤序号不能为空' });
+  }
+  if (!delegatee) {
+    return res.status(400).json({ error: '被委托人不能为空' });
+  }
+  if (!delegator) {
+    return res.status(400).json({ error: '委托人不能为空' });
+  }
+
+  const stepIdx = parseInt(stepIndex, 10);
+  const result = store.completeSOPStepWithDelegation(executionId, stepIdx, delegatee, inputData, delegator);
+
+  if (result.error) {
+    return res.status(400).json({ error: result.error, blockedAtStep: result.blockedAtStep });
+  }
+
+  broadcastSOPStepCompleted(result.execution, stepIdx, delegatee);
+
+  if (result.execution.status === 'completed') {
+    broadcastSOPExecution(result.execution, 'completed');
+  }
+
+  res.json(result);
+}
+
+function getSOPExecutionDelegationRecords(req, res) {
+  const { executionId } = req.params;
+
+  const execution = store.getSOPExecution(executionId);
+  if (!execution) {
+    return res.status(404).json({ error: 'SOP执行实例不存在' });
+  }
+
+  const records = store.getSOPExecutionDelegationRecords(executionId);
+  res.json({ executionId, records });
+}
+
+function checkDelegationValidity(req, res) {
+  const { delegator, delegatee, scene, requiredRole } = req.body;
+
+  if (!delegator || !delegatee) {
+    return res.status(400).json({ error: '委托人和被委托人不能为空' });
+  }
+
+  const isValid = store.hasValidDelegation(
+    delegator,
+    delegatee,
+    scene || null,
+    requiredRole || null
+  );
+
+  res.json({
+    delegator,
+    delegatee,
+    scene: scene || null,
+    requiredRole: requiredRole || null,
+    isValid
+  });
 }
 
 module.exports = {
@@ -386,5 +696,23 @@ module.exports = {
   getSOPStatistics,
   getSOPTimeoutAlerts,
   acknowledgeSOPTimeoutAlert,
-  checkSOPStepTimeouts
+  checkSOPStepTimeouts,
+  createSOPEscalationPath,
+  getAllSOPEscalationPaths,
+  getSOPEscalationPath,
+  updateSOPEscalationPath,
+  deleteSOPEscalationPath,
+  createSOPDelegation,
+  getAllSOPDelegations,
+  getSOPDelegation,
+  updateSOPDelegation,
+  deleteSOPDelegation,
+  getDelegationsForDelegator,
+  getDelegationsForDelegatee,
+  escalateSOPExecution,
+  deescalateSOPExecution,
+  getSOPExecutionEscalationHistory,
+  completeSOPStepWithDelegation,
+  getSOPExecutionDelegationRecords,
+  checkDelegationValidity
 };

@@ -57,6 +57,12 @@ class DataStore {
     this.nextSopExecId = 1;
     this.sopTimeoutAlerts = new Map();
     this.nextSopTimeoutAlertId = 1;
+    this.sopEscalationPaths = new Map();
+    this.nextSopEscalationPathId = 1;
+    this.sopDelegations = new Map();
+    this.nextSopDelegationId = 1;
+    this.sopExecutionEscalationHistory = new Map();
+    this.sopExecutionDelegationRecords = new Map();
     this.defaultSOPs = {
       'deviation_close_minor': {
         name: '轻微偏差关闭流程',
@@ -215,6 +221,14 @@ class DataStore {
         return `SOP_EX${String(this.nextSopExecId++).padStart(6, '0')}`;
       case 'sopTimeoutAlert':
         return `SOP_TA${String(this.nextSopTimeoutAlertId++).padStart(6, '0')}`;
+      case 'sopEscalationPath':
+        return `SOP_EP${String(this.nextSopEscalationPathId++).padStart(4, '0')}`;
+      case 'sopDelegation':
+        return `SOP_DLG${String(this.nextSopDelegationId++).padStart(6, '0')}`;
+      case 'sopEscalationHistory':
+        return `SOP_EH${String(Date.now())}`;
+      case 'sopDelegationRecord':
+        return `SOP_DR${String(Date.now())}`;
       default:
         return Date.now();
     }
@@ -2159,6 +2173,638 @@ class DataStore {
       highestTimeoutStep,
       sceneBreakdown
     };
+  }
+
+  addSOPEscalationPath(path) {
+    const id = this.generateId('sopEscalationPath');
+    const now = new Date().toISOString();
+    const pathWithId = {
+      id,
+      name: path.name,
+      description: path.description || '',
+      scene: path.scene,
+      fromSOPDefinitionId: path.fromSOPDefinitionId,
+      fromSOPName: path.fromSOPName || '',
+      toSOPDefinitionId: path.toSOPDefinitionId,
+      toSOPName: path.toSOPName || '',
+      direction: path.direction || 'escalate',
+      triggerCondition: path.triggerCondition || { type: 'step_timeout' },
+      isActive: path.isActive !== false,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.sopEscalationPaths.set(id, pathWithId);
+    return pathWithId;
+  }
+
+  getSOPEscalationPath(id) {
+    return this.sopEscalationPaths.get(id) || null;
+  }
+
+  getAllSOPEscalationPaths() {
+    return Array.from(this.sopEscalationPaths.values());
+  }
+
+  getSOPEscalationPathsByScene(scene) {
+    return Array.from(this.sopEscalationPaths.values()).filter(p => p.scene === scene && p.isActive);
+  }
+
+  getEscalationPathForSOP(sopDefinitionId, direction = 'escalate') {
+    return Array.from(this.sopEscalationPaths.values()).find(
+      p => p.fromSOPDefinitionId === sopDefinitionId && p.direction === direction && p.isActive
+    );
+  }
+
+  updateSOPEscalationPath(id, updates) {
+    const path = this.sopEscalationPaths.get(id);
+    if (!path) return null;
+    const updated = { ...path, ...updates, updatedAt: new Date().toISOString() };
+    this.sopEscalationPaths.set(id, updated);
+    return updated;
+  }
+
+  deleteSOPEscalationPath(id) {
+    return this.sopEscalationPaths.delete(id);
+  }
+
+  addSOPDelegation(delegation) {
+    const id = this.generateId('sopDelegation');
+    const now = new Date().toISOString();
+    const delegationWithId = {
+      id,
+      delegator: delegation.delegator,
+      delegatee: delegation.delegatee,
+      scene: delegation.scene || null,
+      requiredRole: delegation.requiredRole || null,
+      startTime: delegation.startTime || now,
+      endTime: delegation.endTime || null,
+      isActive: delegation.isActive !== false,
+      description: delegation.description || '',
+      createdAt: now,
+      createdBy: delegation.createdBy || 'system'
+    };
+    this.sopDelegations.set(id, delegationWithId);
+    return delegationWithId;
+  }
+
+  getSOPDelegation(id) {
+    return this.sopDelegations.get(id) || null;
+  }
+
+  getAllSOPDelegations() {
+    return Array.from(this.sopDelegations.values());
+  }
+
+  getActiveDelegationsForDelegator(delegator, scene = null, requiredRole = null) {
+    const now = Date.now();
+    return Array.from(this.sopDelegations.values()).filter(d => {
+      if (d.delegator !== delegator) return false;
+      if (!d.isActive) return false;
+      if (scene && d.scene && d.scene !== scene) return false;
+      if (requiredRole && d.requiredRole && d.requiredRole !== requiredRole) return false;
+      if (d.startTime && new Date(d.startTime).getTime() > now) return false;
+      if (d.endTime && new Date(d.endTime).getTime() < now) return false;
+      return true;
+    });
+  }
+
+  getActiveDelegationsForDelegatee(delegatee, scene = null, requiredRole = null) {
+    const now = Date.now();
+    return Array.from(this.sopDelegations.values()).filter(d => {
+      if (d.delegatee !== delegatee) return false;
+      if (!d.isActive) return false;
+      if (scene && d.scene && d.scene !== scene) return false;
+      if (requiredRole && d.requiredRole && d.requiredRole !== requiredRole) return false;
+      if (d.startTime && new Date(d.startTime).getTime() > now) return false;
+      if (d.endTime && new Date(d.endTime).getTime() < now) return false;
+      return true;
+    });
+  }
+
+  hasValidDelegation(delegator, delegatee, scene = null, requiredRole = null) {
+    const delegations = this.getActiveDelegationsForDelegator(delegator, scene, requiredRole);
+    return delegations.some(d => d.delegatee === delegatee);
+  }
+
+  updateSOPDelegation(id, updates) {
+    const delegation = this.sopDelegations.get(id);
+    if (!delegation) return null;
+    const updated = { ...delegation, ...updates };
+    this.sopDelegations.set(id, updated);
+    return updated;
+  }
+
+  deleteSOPDelegation(id) {
+    return this.sopDelegations.delete(id);
+  }
+
+  matchSteps(oldSteps, newStepDefs) {
+    const completedOldSteps = oldSteps.filter(s => s.status === 'completed');
+    const completedCount = completedOldSteps.length;
+    const matches = [];
+
+    for (let i = 0; i < newStepDefs.length; i++) {
+      const newStep = newStepDefs[i];
+      let matchedStep = null;
+      let matchScore = 0;
+
+      const oldStepByIndex = oldSteps.find(s => s.stepIndex === (i + 1));
+      if (oldStepByIndex && oldStepByIndex.status === 'completed') {
+        let score = 1;
+        if (oldStepByIndex.actionType === newStep.actionType) {
+          score += 2;
+        }
+        if (oldStepByIndex.name === newStep.name) {
+          score += 3;
+        }
+        if (score > matchScore) {
+          matchScore = score;
+          matchedStep = oldStepByIndex;
+        }
+      }
+
+      const oldStepByName = oldSteps.find(s => s.name === newStep.name && s.status === 'completed');
+      if (oldStepByName && (!matchedStep || 5 > matchScore)) {
+        matchedStep = oldStepByName;
+        matchScore = 5;
+      }
+
+      matches.push({
+        newStepIndex: i + 1,
+        matchedStep,
+        matchScore
+      });
+    }
+
+    const result = [];
+    let lastCompletedNewIndex = 0;
+
+    for (let i = 0; i < matches.length; i++) {
+      if (matches[i].matchedStep) {
+        lastCompletedNewIndex = i + 1;
+      }
+      result.push({
+        newStepIndex: i + 1,
+        isCompleted: i < completedCount && matches[i].matchedStep,
+        matchedStep: matches[i].matchedStep,
+        isNewlyAdded: !matches[i].matchedStep
+      });
+    }
+
+    let preservedCompletedCount = 0;
+    for (let i = 0; i < result.length; i++) {
+      if (i < completedCount) {
+        result[i].isCompleted = true;
+        if (!result[i].matchedStep && completedOldSteps[i]) {
+          result[i].matchedStep = completedOldSteps[i];
+        }
+        if (result[i].isCompleted) {
+          preservedCompletedCount++;
+        }
+      }
+    }
+
+    return { matches: result, preservedCompletedCount };
+  }
+
+  escalateSOPExecution(executionId, triggerReason = 'step_timeout', targetSOPDefinitionId = null) {
+    const exec = this.sopExecutions.get(executionId);
+    if (!exec) return { error: 'SOP执行实例不存在' };
+    if (exec.status !== 'in_progress') return { error: 'SOP执行实例不在进行中状态' };
+
+    const currentSOPDefId = exec.sopDefinitionId;
+
+    let targetSOP = null;
+    if (targetSOPDefinitionId) {
+      targetSOP = this.getSOPDefinition(targetSOPDefinitionId);
+    } else {
+      const escalationPath = this.getEscalationPathForSOP(currentSOPDefId, 'escalate');
+      if (escalationPath) {
+        targetSOP = this.getSOPDefinition(escalationPath.toSOPDefinitionId);
+      }
+    }
+
+    if (!targetSOP) {
+      return { error: '未找到可升级的目标SOP流程' };
+    }
+
+    const now = new Date().toISOString();
+    const currentStepIdx = exec.currentStepIndex;
+    const currentStep = exec.steps.find(s => s.stepIndex === currentStepIdx);
+
+    const { matches } = this.matchSteps(exec.steps, targetSOP.steps);
+
+    const newSteps = [];
+    let newCurrentStepIndex = null;
+
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      const stepDef = targetSOP.steps[i];
+      const oldStep = match.matchedStep;
+
+      let status = 'pending';
+      let startedAt = null;
+      let deadline = null;
+      let completedAt = null;
+      let completedBy = null;
+      let inputData = null;
+      let isOverdue = false;
+      let isDelegated = false;
+      let delegatedFrom = null;
+
+      if (match.isCompleted && oldStep) {
+        status = 'completed';
+        startedAt = oldStep.startedAt;
+        completedAt = oldStep.completedAt;
+        completedBy = oldStep.completedBy;
+        inputData = oldStep.inputData;
+        isDelegated = oldStep.isDelegated || false;
+        delegatedFrom = oldStep.delegatedFrom || null;
+      }
+
+      const newStep = {
+        stepIndex: match.newStepIndex,
+        name: stepDef.name,
+        actionType: stepDef.actionType,
+        description: stepDef.description,
+        timeLimitMinutes: stepDef.timeLimitMinutes,
+        preconditions: stepDef.preconditions || [],
+        requiredRole: stepDef.requiredRole || null,
+        status,
+        startedAt,
+        completedAt,
+        completedBy,
+        inputData,
+        deadline,
+        isOverdue,
+        isDelegated,
+        delegatedFrom,
+        isNewlyAdded: match.isNewlyAdded
+      };
+
+      newSteps.push(newStep);
+    }
+
+    const firstPendingStep = newSteps.find(s => s.status === 'pending');
+    if (firstPendingStep) {
+      newCurrentStepIndex = firstPendingStep.stepIndex;
+      firstPendingStep.status = 'in_progress';
+      firstPendingStep.startedAt = now;
+      if (firstPendingStep.timeLimitMinutes) {
+        firstPendingStep.deadline = new Date(Date.now() + firstPendingStep.timeLimitMinutes * 60 * 1000).toISOString();
+      }
+    } else {
+      newCurrentStepIndex = newSteps.length;
+    }
+
+    const historyId = this.generateId('sopEscalationHistory');
+    const historyRecord = {
+      id: historyId,
+      executionId,
+      fromSOPDefinitionId: currentSOPDefId,
+      fromSOPName: exec.sopName,
+      toSOPDefinitionId: targetSOP.id,
+      toSOPName: targetSOP.name,
+      direction: 'escalate',
+      triggerReason,
+      triggeredAt: now,
+      stepIndexAtTime: currentStepIdx,
+      stepNameAtTime: currentStep ? currentStep.name : '',
+      preservedCompletedSteps: newSteps.filter(s => s.status === 'completed').length
+    };
+
+    let historyList = this.sopExecutionEscalationHistory.get(executionId) || [];
+    historyList.push(historyRecord);
+    this.sopExecutionEscalationHistory.set(executionId, historyList);
+
+    exec.sopDefinitionId = targetSOP.id;
+    exec.sopName = targetSOP.name;
+    exec.steps = newSteps;
+    exec.currentStepIndex = newCurrentStepIndex;
+
+    if (!exec.escalationCount) {
+      exec.escalationCount = 0;
+    }
+    exec.escalationCount++;
+    exec.wasEscalated = true;
+
+    this.sopExecutions.set(executionId, exec);
+
+    return { execution: exec, historyRecord };
+  }
+
+  deescalateSOPExecution(executionId, triggerReason = 'manual', targetSOPDefinitionId = null) {
+    const exec = this.sopExecutions.get(executionId);
+    if (!exec) return { error: 'SOP执行实例不存在' };
+    if (exec.status !== 'in_progress') return { error: 'SOP执行实例不在进行中状态' };
+
+    const currentSOPDefId = exec.sopDefinitionId;
+
+    let targetSOP = null;
+    if (targetSOPDefinitionId) {
+      targetSOP = this.getSOPDefinition(targetSOPDefinitionId);
+    } else {
+      const deescalationPath = this.getEscalationPathForSOP(currentSOPDefId, 'deescalate');
+      if (deescalationPath) {
+        targetSOP = this.getSOPDefinition(deescalationPath.toSOPDefinitionId);
+      }
+    }
+
+    if (!targetSOP) {
+      return { error: '未找到可降级的目标SOP流程' };
+    }
+
+    const now = new Date().toISOString();
+    const currentStepIdx = exec.currentStepIndex;
+    const currentStep = exec.steps.find(s => s.stepIndex === currentStepIdx);
+
+    const { matches } = this.matchSteps(exec.steps, targetSOP.steps);
+
+    const newSteps = [];
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      const stepDef = targetSOP.steps[i];
+      const oldStep = match.matchedStep;
+
+      let status = 'pending';
+      let startedAt = null;
+      let deadline = null;
+      let completedAt = null;
+      let completedBy = null;
+      let inputData = null;
+      let isOverdue = false;
+      let isDelegated = false;
+      let delegatedFrom = null;
+
+      if (match.isCompleted && oldStep) {
+        status = 'completed';
+        startedAt = oldStep.startedAt;
+        completedAt = oldStep.completedAt;
+        completedBy = oldStep.completedBy;
+        inputData = oldStep.inputData;
+        isDelegated = oldStep.isDelegated || false;
+        delegatedFrom = oldStep.delegatedFrom || null;
+      }
+
+      const newStep = {
+        stepIndex: match.newStepIndex,
+        name: stepDef.name,
+        actionType: stepDef.actionType,
+        description: stepDef.description,
+        timeLimitMinutes: stepDef.timeLimitMinutes,
+        preconditions: stepDef.preconditions || [],
+        requiredRole: stepDef.requiredRole || null,
+        status,
+        startedAt,
+        completedAt,
+        completedBy,
+        inputData,
+        deadline,
+        isOverdue,
+        isDelegated,
+        delegatedFrom,
+        isNewlyAdded: match.isNewlyAdded
+      };
+
+      newSteps.push(newStep);
+    }
+
+    let newCurrentStepIndex = 1;
+    const firstIncompleteStep = newSteps.find(s => s.status === 'pending');
+    if (firstIncompleteStep) {
+      newCurrentStepIndex = firstIncompleteStep.stepIndex;
+      firstIncompleteStep.status = 'in_progress';
+      firstIncompleteStep.startedAt = now;
+      if (firstIncompleteStep.timeLimitMinutes) {
+        firstIncompleteStep.deadline = new Date(Date.now() + firstIncompleteStep.timeLimitMinutes * 60 * 1000).toISOString();
+      }
+    } else {
+      newCurrentStepIndex = newSteps.length;
+    }
+
+    const historyId = this.generateId('sopEscalationHistory');
+    const historyRecord = {
+      id: historyId,
+      executionId,
+      fromSOPDefinitionId: currentSOPDefId,
+      fromSOPName: exec.sopName,
+      toSOPDefinitionId: targetSOP.id,
+      toSOPName: targetSOP.name,
+      direction: 'deescalate',
+      triggerReason,
+      triggeredAt: now,
+      stepIndexAtTime: currentStepIdx,
+      stepNameAtTime: currentStep ? currentStep.name : '',
+      preservedCompletedSteps: newSteps.filter(s => s.status === 'completed').length
+    };
+
+    let historyList = this.sopExecutionEscalationHistory.get(executionId) || [];
+    historyList.push(historyRecord);
+    this.sopExecutionEscalationHistory.set(executionId, historyList);
+
+    exec.sopDefinitionId = targetSOP.id;
+    exec.sopName = targetSOP.name;
+    exec.steps = newSteps;
+    exec.currentStepIndex = newCurrentStepIndex;
+
+    if (!exec.deescalationCount) {
+      exec.deescalationCount = 0;
+    }
+    exec.deescalationCount++;
+
+    this.sopExecutions.set(executionId, exec);
+
+    return { execution: exec, historyRecord };
+  }
+
+  getSOPExecutionEscalationHistory(executionId) {
+    return this.sopExecutionEscalationHistory.get(executionId) || [];
+  }
+
+  completeSOPStepWithDelegation(executionId, stepIndex, delegatee, inputData, delegator) {
+    const exec = this.sopExecutions.get(executionId);
+    if (!exec) return { error: 'SOP执行实例不存在' };
+    if (exec.status !== 'in_progress') return { error: 'SOP执行实例不在进行中状态' };
+    if (exec.currentStepIndex !== stepIndex) return { error: '当前步骤不匹配，不能跳步' };
+
+    const step = exec.steps.find(s => s.stepIndex === stepIndex);
+    if (!step || step.status !== 'in_progress') return { error: '步骤不在进行中状态' };
+
+    if (step.isOverdue) {
+      return { error: '该步骤已超时，请联系主管处理' };
+    }
+
+    if (!delegator) {
+      return { error: '委托操作必须指定委托人(delegator)' };
+    }
+    if (!delegatee) {
+      return { error: '委托操作必须指定被委托人(delegatee)' };
+    }
+
+    const hasValidDelegation = this.hasValidDelegation(delegator, delegatee, exec.scene, step.requiredRole);
+    if (!hasValidDelegation) {
+      return { error: `${delegatee} 没有 ${delegator} 的有效委托权限` };
+    }
+
+    const precondition = this.checkStepPreconditions(executionId, stepIndex);
+    if (!precondition.passed) {
+      return { error: precondition.reason, blockedAtStep: precondition.blockedAtStep };
+    }
+
+    const now = new Date().toISOString();
+    step.status = 'completed';
+    step.completedAt = now;
+    step.completedBy = delegatee;
+    step.isDelegated = true;
+    step.delegatedFrom = delegator;
+    if (inputData !== undefined && inputData !== null) {
+      step.inputData = inputData;
+    }
+
+    const recordId = this.generateId('sopDelegationRecord');
+    const delegationRecord = {
+      id: recordId,
+      executionId,
+      stepIndex,
+      stepName: step.name,
+      delegator,
+      delegatee,
+      completedAt: now,
+      requiredRole: step.requiredRole,
+      scene: exec.scene
+    };
+
+    let records = this.sopExecutionDelegationRecords.get(executionId) || [];
+    records.push(delegationRecord);
+    this.sopExecutionDelegationRecords.set(executionId, records);
+
+    const allCompleted = exec.steps.every(s => s.status === 'completed');
+    if (allCompleted) {
+      exec.status = 'completed';
+      exec.completedAt = now;
+      exec.currentStepIndex = stepIndex;
+    } else {
+      const nextStepIndex = stepIndex + 1;
+      const nextStep = exec.steps.find(s => s.stepIndex === nextStepIndex);
+      if (nextStep) {
+        nextStep.status = 'in_progress';
+        nextStep.startedAt = now;
+        if (nextStep.timeLimitMinutes) {
+          nextStep.deadline = new Date(Date.now() + nextStep.timeLimitMinutes * 60 * 1000).toISOString();
+        }
+        exec.currentStepIndex = nextStepIndex;
+      }
+    }
+
+    this.sopExecutions.set(executionId, exec);
+    return { execution: exec, delegationRecord };
+  }
+
+  getSOPExecutionDelegationRecords(executionId) {
+    return this.sopExecutionDelegationRecords.get(executionId) || [];
+  }
+
+  checkAndAutoEscalate(executionId) {
+    const exec = this.sopExecutions.get(executionId);
+    if (!exec || exec.status !== 'in_progress') return null;
+
+    const currentStep = exec.steps.find(s => s.stepIndex === exec.currentStepIndex);
+    if (!currentStep || !currentStep.isOverdue) return null;
+
+    const escalationPath = this.getEscalationPathForSOP(exec.sopDefinitionId, 'escalate');
+    if (!escalationPath) return null;
+
+    if (escalationPath.triggerCondition.type === 'step_timeout') {
+      const result = this.escalateSOPExecution(executionId, 'step_timeout_auto');
+      if (result && !result.error) {
+        return result;
+      }
+    }
+
+    return null;
+  }
+
+  initializeDefaultEscalationPaths() {
+    const paths = [
+      {
+        name: '轻微偏差升级为一般偏差',
+        scene: 'deviation_close_minor',
+        fromScene: 'deviation_close_minor',
+        toScene: 'deviation_close_moderate',
+        direction: 'escalate',
+        triggerCondition: { type: 'step_timeout' },
+        description: '轻微偏差步骤超时后自动升级为一般偏差流程'
+      },
+      {
+        name: '一般偏差升级为严重偏差',
+        scene: 'deviation_close_moderate',
+        fromScene: 'deviation_close_moderate',
+        toScene: 'deviation_close_critical',
+        direction: 'escalate',
+        triggerCondition: { type: 'step_timeout' },
+        description: '一般偏差步骤超时后自动升级为严重偏差流程'
+      },
+      {
+        name: '严重偏差升级为致命偏差',
+        scene: 'deviation_close_critical',
+        fromScene: 'deviation_close_critical',
+        toScene: 'deviation_close_severe',
+        direction: 'escalate',
+        triggerCondition: { type: 'step_timeout' },
+        description: '严重偏差步骤超时后自动升级为致命偏差流程'
+      }
+    ];
+
+    for (const path of paths) {
+      const existing = Array.from(this.sopEscalationPaths.values()).find(
+        p => p.scene === path.scene && p.direction === path.direction
+      );
+      if (!existing) {
+        const fromSOP = this.getSOPForScene(path.fromScene);
+        const toSOP = this.getSOPForScene(path.toScene);
+        if (fromSOP && toSOP) {
+          this.addSOPEscalationPath({
+            name: path.name,
+            description: path.description,
+            scene: path.scene,
+            fromSOPDefinitionId: fromSOP.id,
+            fromSOPName: fromSOP.name,
+            toSOPDefinitionId: toSOP.id,
+            toSOPName: toSOP.name,
+            direction: path.direction,
+            triggerCondition: path.triggerCondition
+          });
+        }
+      }
+    }
+  }
+
+  initializeDefaultDelegations() {
+    const defaultDelegations = [
+      {
+        delegator: '张主管',
+        delegatee: '李副主管',
+        scene: null,
+        requiredRole: 'supervisor',
+        description: '张主管不在时，由李副主管代签主管审批步骤'
+      },
+      {
+        delegator: '王总监',
+        delegatee: '张主管',
+        scene: null,
+        requiredRole: 'director',
+        description: '王总监不在时，由张主管代签总监审批步骤'
+      }
+    ];
+
+    for (const del of defaultDelegations) {
+      const existing = Array.from(this.sopDelegations.values()).find(
+        d => d.delegator === del.delegator && d.delegatee === del.delegatee && d.requiredRole === del.requiredRole
+      );
+      if (!existing) {
+        this.addSOPDelegation(del);
+      }
+    }
   }
 }
 
